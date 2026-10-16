@@ -2,19 +2,9 @@
 import { CopyValue } from "../../components/copy-value";
 import { displayAction } from "../../lib/explorer/labels";
 import { useRef, useState } from "react";
+import { explorerLookup, type ExplorerResult } from "../../lib/explorer/browser";
 import { UiText, UiInput } from "../../components/preferences";
 import "./explorer.css";
-type RecordData = Record<string, unknown>;
-type Result = {
-  kind: string;
-  query: string;
-  record: RecordData;
-  transactions?: RecordData[];
-  offset?: number;
-  hasMore?: boolean;
-  historyError?: string;
-  fetchedAt: number;
-};
 const show = (x: unknown) =>
   typeof x === "string" || typeof x === "number" ? String(x) : "—";
 function Field({ label, value }: { label: string; value: unknown }) {
@@ -32,7 +22,7 @@ function Field({ label, value }: { label: string; value: unknown }) {
 }
 export default function Explorer() {
   const [q, setQ] = useState(""),
-    [result, setResult] = useState<Result | null>(null),
+    [result, setResult] = useState<ExplorerResult | null>(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const lock = useRef(false);
@@ -42,13 +32,8 @@ export default function Explorer() {
     setBusy(true);
     setError("");
     try {
-      const r = await fetch(
-          `/api/explorer?q=${encodeURIComponent(query.trim())}&offset=${offset}`,
-          { cache: "no-store" },
-        ),
-        d = await r.json();
-      if (!r.ok) throw Error(d.error || "Explorer lookup failed.");
-      setResult(d);
+      const data = await explorerLookup(query, offset);
+      setResult(data);
       setQ(query.trim());
     } catch (e) {
       setResult(null);
