@@ -1,0 +1,792 @@
+.dex-shell {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 36px 24px 80px;
+  color: #f4f4f5;
+}
+
+.dex-shell nav {
+  display: flex;
+  gap: 22px;
+  flex-wrap: wrap;
+}
+
+.dex-shell nav a {
+  color: #b8bac5;
+  text-decoration: none;
+}
+
+.dex-shell header {
+  margin: 55px 0 30px;
+}
+
+.dex-shell h1 {
+  font-size: 42px;
+  font-weight: 700;
+  margin: 10px 0;
+}
+
+.dex-shell h2 {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.dex-shell .dex-eyebrow {
+  color: #ff5c1d;
+  font-size: 11px;
+  letter-spacing: 0.17em;
+}
+
+.dex-shell .dex-card {
+  background: #191b21;
+  border: 1px solid #30333e;
+  border-radius: 20px;
+  padding: 25px;
+  margin: 18px 0;
+}
+
+.dex-shell .dex-card p {
+  margin: 14px 0;
+}
+
+.dex-shell .dex-code {
+  font-family: monospace;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  color: #c3c7d7;
+  line-height: 1.8;
+}
+
+.dex-shell .dex-muted,
+.dex-shell small {
+  color: #a0a5b5;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.dex-shell .dex-tag {
+  color: #8ee0ad;
+  font-size: 12px;
+}
+
+.dex-shell button {
+  padding: 12px 17px;
+  border-radius: 10px;
+  background: #ff5c1d;
+  color: #141518;
+  font-weight: 600;
+  border: 1px solid transparent;
+  cursor: pointer;
+  margin: 5px 5px 5px 0;
+}
+
+.dex-shell button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.dex-shell .dex-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.dex-shell .dex-tabs button {
+  background: #252834;
+  color: #bfc2ce;
+  border: 1px solid #373b49;
+}
+
+.dex-shell .dex-tabs .selected {
+  color: #ffad90;
+  border-color: #ff5c1d;
+}
+
+.dex-shell label {
+  display: block;
+  margin: 20px 0 10px;
+  font-size: 13px;
+}
+
+.dex-shell input,
+.dex-shell select {
+  display: block;
+  width: 100%;
+  background: #0e1015;
+  border: 1px solid #383c48;
+  border-radius: 10px;
+  color: white;
+  padding: 13px;
+  margin: 9px 0;
+  box-sizing: border-box;
+}
+
+.dex-shell .dex-confirm {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.dex-shell .dex-confirm input {
+  width: 18px;
+  margin: 0;
+}
+
+.dex-shell .dex-notice {
+  padding: 18px;
+  border-left: 2px solid #ff5c1d;
+  background: #191b21;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Simple trade cards. Static styles stay mounted through wallet and quote updates. */
+.dex-shell {
+  max-width: 800px;
+}
+.dex-shell header {
+  text-align: center;
+  margin: 42px 0 22px;
+}
+.dex-shell h1 {
+  font-size: 36px;
+}
+.dex-shell .dex-card,
+.dex-shell .wallet-strip,
+.dex-shell > .dex-notice,
+.dex-shell > .dex-muted {
+  max-width: 580px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.dex-shell .wallet-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.dex-shell .wallet-strip a {
+  margin-left: auto;
+  font-size: 12px;
+  color: #b6bbc9;
+}
+.dex-shell .dex-tabs {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  gap: 3px;
+}
+.dex-shell .dex-tabs button {
+  font-size: 12px;
+  white-space: nowrap;
+  padding: 10px 12px;
+}
+.dex-shell .asset-box {
+  border: 1px solid #373a47;
+  border-radius: 15px;
+  background: #111319;
+  padding: 17px;
+}
+.dex-shell .asset-caption {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: #a1a7b7;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+.dex-shell .asset-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 58px;
+}
+.dex-shell .asset-line input {
+  border: 0;
+  background: transparent;
+  text-align: right;
+  font-size: 28px;
+  min-width: 0;
+  width: 60%;
+  padding: 0;
+  outline-offset: 6px;
+}
+.dex-shell .asset-line output {
+  flex: 1;
+  text-align: right;
+  font-size: 25px;
+  font-weight: 500;
+  color: #ececf2;
+  overflow-wrap: anywhere;
+}
+.dex-shell .token-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 25px;
+  background: #242733;
+  color: white;
+  white-space: nowrap;
+  padding: 8px 12px;
+  font-size: 13px;
+  max-width: 65%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dex-shell .token-chip:disabled {
+  opacity: 0.65;
+}
+.dex-shell .coin {
+  width: 25px;
+  height: 25px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #444e62;
+  color: white;
+  border-radius: 50%;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+.dex-shell .coin.native {
+  background: #e94b10;
+}
+.dex-shell .reverse {
+  display: block;
+  position: relative;
+  margin: -8px auto;
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  background: #242733;
+  color: #ffad90;
+  border: 3px solid #191b21;
+  padding: 0;
+  z-index: 1;
+  font-size: 20px;
+}
+.dex-shell .quote-caption {
+  color: #b0b6c5;
+  font-size: 12px;
+  margin: 16px 2px;
+}
+.dex-shell .primary-action {
+  display: block;
+  width: 100%;
+  min-height: 50px;
+  font-size: 15px;
+  margin-top: 18px;
+}
+.dex-shell .swap-settings {
+  margin: 20px 0 10px;
+  font-size: 12px;
+  color: #aeb4c2;
+}
+.dex-shell summary {
+  cursor: pointer;
+}
+.dex-shell .swap-settings summary b {
+  float: right;
+  color: #ffad90;
+}
+.dex-shell .contract-details {
+  margin: 20px 0 0;
+  font-size: 12px;
+  color: #aeb4c2;
+  border-top: 1px solid #303440;
+  padding-top: 13px;
+}
+.dex-shell .position-info {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  font-size: 11px;
+  color: #aaaebe;
+  padding: 14px;
+  border-radius: 12px;
+  background: #101218;
+  margin: 20px 0;
+}
+.dex-shell .position-info b {
+  display: block;
+  margin-top: 5px;
+  color: #e8eaf1;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.dex-shell .pair-heading {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin: 15px 0;
+}
+.dex-shell .inline-error {
+  color: #ffb595;
+  font-size: 12px;
+}
+.dex-shell .picker-overlay {
+  position: fixed;
+  inset: 0;
+  background: #000a;
+  z-index: 100;
+  padding: 28px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dex-shell .token-picker {
+  background: #191b21;
+  width: 460px;
+  max-width: 100%;
+  max-height: 85vh;
+  overflow: auto;
+  border-radius: 22px;
+  border: 1px solid #3b4050;
+  padding: 24px;
+  box-shadow: 0 20px 100px #0008;
+}
+.dex-shell .picker-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.dex-shell .picker-heading h2 {
+  margin: 0;
+  font-size: 22px;
+}
+.dex-shell .close-picker {
+  background: transparent;
+  color: #c1c7d8;
+  font-size: 27px;
+  padding: 0 8px;
+  margin: 0;
+}
+.dex-shell .token-list {
+  margin: 18px 0;
+}
+.dex-shell .token-row {
+  display: flex;
+  width: 100%;
+  background: transparent;
+  color: white;
+  text-align: left;
+  align-items: center;
+  gap: 13px;
+  padding: 13px 8px;
+  border-bottom: 1px solid #292c36;
+  border-radius: 0;
+  margin: 0;
+}
+.dex-shell .token-row:hover {
+  background: #242733;
+}
+.dex-shell .token-row small {
+  display: block;
+  font-weight: 400;
+  font-size: 11px;
+  margin-top: 5px;
+}
+.dex-shell .picker-chevron {
+  margin-left: auto;
+  color: #858da0;
+}
+.dex-shell .load-tokens {
+  width: 100%;
+  background: #272c39;
+  color: #dce0ed;
+}
+@media (max-width: 540px) {
+  .dex-shell {
+    padding: 20px 14px 55px;
+  }
+  .dex-shell .dex-card {
+    padding: 18px;
+  }
+  .dex-shell .asset-box {
+    padding: 13px;
+  }
+  .dex-shell .asset-line input {
+    font-size: 24px;
+  }
+  .dex-shell .token-chip {
+    font-size: 12px;
+    padding: 8px;
+  }
+  .dex-shell .wallet-strip a {
+    margin-left: 0;
+  }
+}
+.dex-shell .refresh-quote {
+  background: transparent;
+  color: #abb3c6;
+  font-size: 11px;
+  padding: 3px 0;
+  margin: 0;
+  font-weight: 400;
+}
+
+/* Compact desktop layout: keep the form and current result in the same view. */
+@media (min-width: 1000px) {
+  .dex-shell {
+    max-width: 1020px;
+    padding: 18px 24px 22px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px 20px;
+    align-items: start;
+  }
+  .dex-shell:has(.review-card, .transaction-card, .recovery-card) {
+    grid-template-columns: minmax(0, 520px) minmax(0, 420px);
+  }
+  .dex-shell > nav,
+  .dex-shell > header,
+  .dex-shell > .wallet-strip {
+    grid-column: 1 / -1;
+  }
+  .dex-shell > nav {
+    gap: 20px;
+    font-size: 12px;
+  }
+  .dex-shell > header {
+    margin: 7px 0 4px;
+  }
+  .dex-shell > header .dex-eyebrow {
+    margin: 0 0 4px;
+    font-size: 10px;
+  }
+  .dex-shell > header h1 {
+    font-size: 27px;
+    margin: 0 0 4px;
+  }
+  .dex-shell > header > p:last-child {
+    font-size: 12px;
+    margin: 0;
+  }
+  .dex-shell > .wallet-strip {
+    width: 100%;
+    max-width: 960px;
+    margin: 0 auto 1px;
+    min-height: 34px;
+  }
+  .dex-shell .wallet-strip > button {
+    padding: 8px 12px;
+    font-size: 12px;
+    margin: 0;
+  }
+  .dex-shell > .dex-card {
+    width: 100%;
+    max-width: none;
+    padding: 17px;
+    margin: 0;
+    box-sizing: border-box;
+    border-radius: 16px;
+  }
+  .dex-shell > .trade-card {
+    grid-column: 1;
+    max-width: 520px;
+    justify-self: center;
+  }
+  .dex-shell:has(.review-card, .transaction-card, .recovery-card)
+    > .trade-card {
+    grid-row: 4 / span 3;
+  }
+  .dex-shell > .review-card,
+  .dex-shell > .transaction-card,
+  .dex-shell > .recovery-card {
+    grid-column: 2;
+  }
+  .dex-shell > .dex-notice {
+    grid-column: 1 / -1;
+    width: 100%;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 9px 12px;
+    font-size: 12px;
+    line-height: 1.5;
+    box-sizing: border-box;
+  }
+  .dex-shell > .dex-notice:empty {
+    display: none;
+  }
+  .dex-shell > .dex-muted {
+    grid-column: 1 / -1;
+    max-width: 960px;
+    margin: 0;
+    font-size: 10px;
+  }
+  .dex-shell .dex-tabs {
+    gap: 4px;
+    margin: 0 0 12px;
+    padding-bottom: 3px;
+  }
+  .dex-shell .dex-tabs button {
+    font-size: 11px;
+    padding: 8px 9px;
+    margin: 0;
+  }
+  .dex-shell .asset-box {
+    padding: 12px 14px;
+    border-radius: 12px;
+  }
+  .dex-shell .asset-line {
+    min-height: 45px;
+  }
+  .dex-shell .asset-line input {
+    font-size: 25px;
+    margin: 5px 0;
+  }
+  .dex-shell .asset-line output {
+    font-size: 23px;
+  }
+  .dex-shell .token-chip {
+    padding: 6px 9px;
+    margin: 3px 0;
+    font-size: 12px;
+  }
+  .dex-shell .reverse {
+    width: 29px;
+    height: 29px;
+    font-size: 17px;
+    margin: -7px auto;
+  }
+  .dex-shell label {
+    font-size: 12px;
+    margin: 12px 0 5px;
+  }
+  .dex-shell input,
+  .dex-shell select {
+    padding: 10px 12px;
+    margin: 6px 0;
+  }
+  .dex-shell .asset-line input {
+    padding: 0;
+  }
+  .dex-shell .position-info {
+    gap: 9px 16px;
+    padding: 11px 13px;
+    margin: 12px 0;
+  }
+  .dex-shell .pair-heading {
+    margin: 6px 0 10px;
+  }
+  .dex-shell .swap-settings {
+    margin: 12px 0 7px;
+  }
+  .dex-shell .contract-details {
+    margin: 10px 0 0;
+    padding-top: 9px;
+  }
+  .dex-shell .quote-caption {
+    margin: 11px 0 8px;
+  }
+  .dex-shell .dex-card p {
+    margin: 9px 0;
+  }
+  .dex-shell .dex-card h2 {
+    font-size: 20px;
+    margin: 0 0 12px;
+  }
+  .dex-shell .dex-card .dex-muted {
+    font-size: 11px;
+    line-height: 1.45;
+  }
+  .dex-shell .primary-action {
+    min-height: 42px;
+    margin: 12px 0 0;
+    padding: 10px 14px;
+    font-size: 14px;
+  }
+  .dex-shell .transaction-card button,
+  .dex-shell .review-card > button,
+  .dex-shell .recovery-card button {
+    font-size: 12px;
+    padding: 10px 12px;
+  }
+  .dex-shell .dex-confirm {
+    line-height: 1.5;
+  }
+  .dex-shell .token-picker {
+    max-height: 78vh;
+  }
+}
+@media (min-width: 1000px) and (max-height: 780px) {
+  .dex-shell {
+    padding-top: 10px;
+    gap: 7px 18px;
+  }
+  .dex-shell > header > p:last-child {
+    display: none;
+  }
+  .dex-shell > header h1 {
+    font-size: 23px;
+  }
+  .dex-shell .asset-box {
+    padding: 9px 12px;
+  }
+  .dex-shell .asset-line {
+    min-height: 38px;
+  }
+  .dex-shell .dex-tabs {
+    margin-bottom: 9px;
+  }
+}
+.dex-shell .amount-presets {
+  display: flex;
+  justify-content: flex-end;
+  gap: 5px;
+  margin: 4px 0 0;
+}
+.dex-shell .amount-presets button {
+  padding: 3px 9px;
+  margin: 0;
+  min-height: 0;
+  background: #252a36;
+  border: 1px solid #343b4b;
+  border-radius: 6px;
+  color: #bdc6d8;
+  font-size: 10px;
+  font-weight: 500;
+}
+.dex-shell .amount-presets button:last-child {
+  color: #ffad90;
+}
+.dex-shell .amount-presets button:hover:not(:disabled) {
+  border-color: #ff5c1d;
+  color: #ffad90;
+}
+
+/* Stable vertical flow: form first, then approval, transaction and recovery. */
+.dex-shell,
+.dex-shell:has(.review-card, .transaction-card, .recovery-card) {
+  display: flex;
+  flex-direction: column;
+  max-width: 640px;
+  align-items: stretch;
+  gap: 12px;
+  padding: 18px 22px 32px;
+}
+.dex-shell > .dex-card,
+.dex-shell > .trade-card,
+.dex-shell > .review-card,
+.dex-shell > .transaction-card,
+.dex-shell > .recovery-card,
+.dex-shell > .wallet-strip,
+.dex-shell > .dex-notice,
+.dex-shell > .dex-muted {
+  width: 100%;
+  max-width: 580px;
+  margin-left: auto;
+  margin-right: auto;
+  grid-column: auto;
+  grid-row: auto;
+}
+.dex-shell > .dex-card {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+.dex-shell .funding-alert {
+  margin: 16px 0 10px;
+  padding: 14px;
+  border: 1px solid #a96935;
+  border-radius: 12px;
+  background: #30251d;
+  color: #f1d3ae;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.dex-shell .funding-alert h3 {
+  font-size: 15px;
+  font-weight: 650;
+  margin: 0 0 8px;
+}
+.dex-shell .funding-alert p {
+  margin: 8px 0;
+}
+.dex-shell .funding-alert button,
+.dex-shell .liquidity-return button {
+  font-size: 12px;
+  padding: 9px 12px;
+}
+.dex-shell .liquidity-return {
+  margin-top: 12px;
+  font-size: 12px;
+  color: #b8bfcb;
+}
+html[data-theme="light"] .dex-shell .funding-alert {
+  background: #fff5e6;
+  border-color: #d7aa70;
+  color: #604019;
+}
+html[data-theme="light"] .dex-shell .liquidity-return {
+  color: #555f70;
+}
+
+/* A single visible step avoids duplicating the form below its review. */
+.dex-shell > .trade-card[hidden] {
+  display: none !important;
+}
+.dex-stage-context {
+  font-size: 12px;
+  color: #bcc5d1;
+  border: 1px solid #383d49;
+  border-radius: 9px;
+  padding: 10px 13px;
+  overflow-wrap: anywhere;
+}
+.dex-shell .review-card p {
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 8px 0;
+}
+.dex-shell .review-card h2,
+.dex-shell .transaction-card h2 {
+  font-size: 21px;
+  margin: 6px 0 12px;
+}
+.dex-shell .review-card .dex-confirm {
+  margin: 12px 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.dex-shell .review-card .contract-details {
+  margin: 10px 0;
+  padding-top: 9px;
+}
+.dex-shell .review-card .dex-muted {
+  font-size: 11px;
+  line-height: 1.5;
+}
+.dex-shell .back-to-edit {
+  background: #2c303b;
+  color: #e1e5ed;
+  border: 1px solid #434957;
+}
+html[data-theme="light"] .dex-stage-context {
+  background: #fff;
+  color: #364050;
+  border-color: #d2d9e2;
+}
+html[data-theme="light"] .dex-shell .back-to-edit {
+  background: #edf0f5;
+  color: #26313e;
+  border-color: #cbd3de;
+}
+@media (min-width: 900px) {
+  .dex-shell {
+    gap: 9px;
+    padding-top: 12px;
+  }
+  .dex-shell > header {
+    margin: 3px 0;
+  }
+  .dex-shell > .wallet-strip {
+    margin-bottom: 0;
+  }
+  .dex-shell > .dex-card {
+    padding: 16px;
+  }
+}
