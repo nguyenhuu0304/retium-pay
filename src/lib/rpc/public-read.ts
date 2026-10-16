@@ -1,14 +1,14 @@
 // Public display data only. Never use browser results as proof of payment.
 const publicRPC = "https://rpc.retium.org";
-export async function publicRead(endpoint: string) {
-  if (!/^\/(?:transaction\/tx_[0-9a-f]{32}|contract\/[0-9a-f]{64}|wallet\/rete[0-9a-f]{68}(?:\/transactions\?limit=20&offset=\d+)?)$/.test(endpoint)) {
+export async function publicRead(endpoint: string, signal?: AbortSignal) {
+  if (endpoint.length > 600 || !/^\/(?:transaction\/tx_[0-9a-f]{32}|contract\/[0-9a-f]{64}(?:\/query\?method=(?:list_pools|get_pool|get_lp_balance|balance_of|allowance)&args=[0-9A-Za-z_,]*)?|wallet\/rete[0-9a-f]{68}(?:\/transactions\?limit=20&offset=\d+)?)$/.test(endpoint)) {
     throw Error("Unsupported public read.");
   }
   let response: Response;
   try {
     response = await fetch(`${publicRPC}/api${endpoint}`, {
       method: "GET", credentials: "omit", redirect: "error", cache: "no-store",
-      headers: { Accept: "application/json" }, signal: AbortSignal.timeout(12_000),
+      headers: { Accept: "application/json" }, signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(12_000)]) : AbortSignal.timeout(12_000),
     });
   } catch {
     throw Error("Could not read the public Retium API from this browser. Try again later.");

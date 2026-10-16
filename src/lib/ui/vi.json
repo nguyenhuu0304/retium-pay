@@ -420,5 +420,6 @@
   "Minimum 2 payers — Remove is unavailable": "Cần ít nhất 2 người trả — chưa thể xóa",
   "Awaiting payment": "Đang chờ thanh toán",
   "payers": "người trả",
-  "Total": "Tổng"
+  "Total": "Tổng",
+  "Transaction review is unavailable. No transaction has been sent. Please try again later.": "Hiện chưa thể kiểm tra giao dịch. Chưa có giao dịch nào được gửi. Vui lòng thử lại sau."
 }

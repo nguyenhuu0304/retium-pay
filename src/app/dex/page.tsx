@@ -7,6 +7,7 @@ import {
   WalletRequired,
 } from "../../components/shared-wallet";
 import { assessFunding } from "../../lib/dex/funding";
+import { tokenPage, marketSummary } from "../../lib/dex/browser";
 import Link from "next/link";
 import "./dex.css";
 import { useEffect, useRef, useState } from "react";
@@ -147,14 +148,8 @@ export default function DexPage() {
     const timer = setTimeout(() => {
       setMarketLoading(true);
       setMarketError("");
-      fetch(`/api/dex?view=market&token=${token}&wallet=${wallet}`, {
-        cache: "no-store",
-        signal: controller.signal,
-      })
-        .then(async (response) => {
-          const data = await response.json();
-          if (!response.ok)
-            throw Error(data.error || "Could not load this token.");
+      marketSummary(token, wallet)
+        .then((data) => {
           if (!controller.signal.aborted) {
             setMarketData(data);
             setSelectedSymbol(data.symbol);
@@ -363,12 +358,7 @@ export default function DexPage() {
     setBusy(true);
     try {
       const [page, offset] = cursor.split(":");
-      const response = await fetch(
-        `/api/dex?view=tokens&cursor=${page}&offset=${offset}`,
-        { cache: "no-store" },
-      );
-      const data = await response.json();
-      if (!response.ok) throw Error(data.error || "Could not load tokens.");
+      const data = await tokenPage(page, Number(offset));
       setPoolList((old) => [
         ...new Map(
           [...old, ...data.tokens].map((item) => [item.token, item]),
@@ -425,7 +415,10 @@ export default function DexPage() {
           : "Review the exact contract, arguments and minimum amounts before signing.",
       );
     } catch (e) {
-      setNotice(message(e));
+      const error = message(e);
+      setNotice(/403|Unexpected token|invalid JSON/i.test(error)
+        ? "Transaction review is unavailable. No transaction has been sent. Please try again later."
+        : error);
     } finally {
       running.current = false;
       setBusy(false);
