@@ -20,11 +20,11 @@ Install Node.js 24 and npm. In the project directory:
 
 ```powershell
 npm ci
-Copy-Item .env.example .env.local
+if (-not (Test-Path .env.local)) { Copy-Item .env.example .env.local }
 code .env.local
 ```
 
-Set `TELEGRAM_BOT_TOKEN` to your own bot token. Leave `APP_URL=http://localhost:3000` for local testing. Never share or commit `.env.local`.
+For file-based local testing, remove the placeholder DATABASE_URL line. Set `TELEGRAM_BOT_TOKEN` to your own bot token. Leave `APP_URL=http://localhost:3000` for local testing. Never share or commit `.env.local`.
 
 Build and start the web server:
 
@@ -69,7 +69,9 @@ After a response is interrupted, check My History or use bill recovery before cr
 
 A public GitHub repository does **not** host this application. GitHub Pages cannot run its server APIs or workers.
 
-Use a Node.js server with a persistent writable `data/` directory and HTTPS. Keep the Telegram bot and payments worker running as separate processes. This file-based version is intended for one app instance sharing the same data directory; it is not a stateless or multi-instance deployment.
+For Vercel, set DATABASE_URL to a private PostgreSQL database shared by the web, Telegram bot and worker. See [DEPLOY_VERCEL.md](DEPLOY_VERCEL.md) for the insert-only migration and deployment order. On Vercel there is no file-storage fallback. The two background runners continue on the Windows host in this release.
+
+For local mode without DATABASE_URL, use the persistent writable data directory and one app instance; keep the bot and worker in that same directory.
 
 Set `APP_URL=https://YOUR_APP_HOST` before starting the web server and worker. Telegram messages generated with a public HTTPS URL include a Pay button for the request amount. Localhost test links only work on the computer running the app. Previously sent Telegram messages do not automatically change after the URL is updated.
 
@@ -77,7 +79,7 @@ After changing the public origin, connect and verify again on that origin. The w
 
 ## Data and secrets
 
-Runtime data is stored under `data/`: Telegram registration/link information, contacts, requests, transactions, worker state and private service keys. It must survive restarts and must not be committed. Back up and restrict access to this directory.
+With DATABASE_URL, runtime data and service keys are held in the private PostgreSQL database. Protect its connection string and database backups. Without DATABASE_URL in local mode, runtime data is stored under data/. Keep local files for backup after migrating; they are no longer the live source once PostgreSQL is enabled. Neither credentials nor user data belong in GitHub.
 
 The app does not need wallet seed phrases or private keys; wallet approval remains with the user. `.env.example` contains placeholders only. Use your own Telegram bot; the source UI currently references `@RetiumPay_Bot`, so adjust those display links for a separate deployment.
 
@@ -96,3 +98,8 @@ Development checks covered signed payment validation, duplicate prevention, grou
 Retium Wallet Connect and the Retium RPC are external services. DEX actions use the existing trading contract; using the Retium Pay interface does not change the on-chain contract's ownership or identity.
 
 The bundled fungible-token WASM template originates from Whisk. See THIRD_PARTY.md. Project-wide licensing has not been selected in this snapshot; public source visibility alone does not grant a new redistribution license.
+
+
+## Vercel deployment
+
+This release adds shared PostgreSQL persistence for Vercel. See [DEPLOY_VERCEL.md](DEPLOY_VERCEL.md) for migration, environment configuration and the two local runners. The older file-storage hosting notes below/above apply only when DATABASE_URL is absent in local mode.

@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
+import { readData as readFile, saveData, checkStorage } from "../src/lib/storage/store.mjs";
 import { createHash, randomBytes } from "node:crypto";
 import path from "node:path";
 
@@ -12,7 +12,7 @@ if (!token || token === "DAN_TOKEN_BOT_MOI_VAO_DAY") {
 const dataDirectory = path.resolve("data");
 const statePath = path.join(dataDirectory, "telegram-state.json");
 
-await mkdir(dataDirectory, { recursive: true });
+if (process.env.DATABASE_URL) await checkStorage();
 
 let state = { offset: 0, registrations: {} };
 
@@ -37,12 +37,7 @@ try {
 }
 
 async function saveState() {
-  const temporaryPath = `${statePath}.tmp`;
-  await writeFile(temporaryPath, JSON.stringify(state, null, 2), {
-    encoding: "utf8",
-    mode: 0o600,
-  });
-  await rename(temporaryPath, statePath);
+  await saveData(statePath, state);
 }
 
 class TelegramError extends Error {

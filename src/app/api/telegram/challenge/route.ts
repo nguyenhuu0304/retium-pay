@@ -1,11 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import {
-  mkdir,
-  readFile,
-  rename,
-  rmdir,
-  writeFile,
-} from "node:fs/promises";
+import { readData as readFile, withDocument } from "../../../../lib/storage/store.mjs";
 import path from "node:path";
 import { NextResponse } from "next/server";
 import { ml_dsa44 } from "@noble/post-quantum/ml-dsa.js";
@@ -49,7 +43,6 @@ class RequestError extends Error {
 
 const directory = path.join(process.cwd(), "data");
 const statePath = path.join(directory, "telegram-links.json");
-const lockPath = path.join(directory, ".telegram-links-lock");
 const cookieName = "retium_telegram_challenge";
 const encoder = new TextEncoder();
 
@@ -98,39 +91,8 @@ function errorCode(error: unknown) {
 async function withState<T>(
   action: (state: AuthState) => Promise<T>,
 ): Promise<T> {
-  await mkdir(directory, { recursive: true });
-
-  let acquired = false;
-
-  for (let attempt = 0; attempt < 50; attempt++) {
-    try {
-      await mkdir(lockPath);
-      acquired = true;
-      break;
-    } catch (error) {
-      if (errorCode(error) !== "EEXIST") throw error;
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-  }
-
-  if (!acquired) {
-    throw new RequestError("Link storage is busy. Try again shortly.", 503);
-  }
-
-  try {
-    let state: AuthState;
-
-    try {
-      state = JSON.parse(await readFile(statePath, "utf8"));
-
-      if (!state.challenges || !state.usedCodes || !state.links) {
-        throw new Error("Invalid link storage");
-      }
-    } catch (error) {
-      if (errorCode(error) !== "ENOENT") throw error;
-      state = { challenges: {}, usedCodes: {}, links: {} };
-    }
-
+  return withDocument(statePath, () => ({ challenges: {}, usedCodes: {}, links: {} } as AuthState), async (state: AuthState) => {
+    if (!state.challenges || !state.usedCodes || !state.links) throw new Error("Invalid link storage");
     const now = Date.now();
 
     for (const [id, challenge] of Object.entries(state.challenges)) {
@@ -138,18 +100,8 @@ async function withState<T>(
     }
 
     const result = await action(state);
-    const temporaryPath = `${statePath}.${randomBytes(8).toString("hex")}.tmp`;
-
-    await writeFile(temporaryPath, JSON.stringify(state, null, 2), {
-      encoding: "utf8",
-      mode: 0o600,
-    });
-    await rename(temporaryPath, statePath);
-
     return result;
-  } finally {
-    await rmdir(lockPath);
-  }
+  });
 }
 
 async function findRegistration(code: string): Promise<Registration> {
@@ -462,3 +414,4 @@ export async function POST(request: Request) {
     );
   }
 }
+export const maxDuration = 60;

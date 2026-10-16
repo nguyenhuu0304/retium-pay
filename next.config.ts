@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  outputFileTracingIncludes: { "/api/dex": ["./public/contracts/meme_token.wasm"] },
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {

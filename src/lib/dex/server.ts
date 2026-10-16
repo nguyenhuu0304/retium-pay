@@ -2,10 +2,10 @@ import { blake3 } from "@noble/hashes/blake3.js";
 import {
   createHash,
   createHmac,
-  randomBytes,
   timingSafeEqual,
 } from "node:crypto";
-import { mkdir, readFile, writeFile, rename, rmdir } from "node:fs/promises";
+import { readFile as readAsset } from "node:fs/promises";
+import { readData as readFile, withDocument, stableSecret } from "../storage/store.mjs";
 import path from "node:path";
 import {
   UNIT,
@@ -154,19 +154,7 @@ export async function market(token: string, wallet: string) {
   };
 }
 async function key() {
-  await mkdir(directory, { recursive: true });
-  const file = path.join(directory, "dex-intents.key");
-  try {
-    await writeFile(file, randomBytes(32).toString("hex"), {
-      flag: "wx",
-      mode: 0o600,
-    });
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
-  }
-  const k = (await readFile(file, "utf8")).trim();
-  if (!/^[0-9a-f]{64}$/.test(k)) throw Error("Invalid DEX signing key.");
-  return k;
+  return stableSecret(path.join(directory, "dex-intents.key"));
 }
 export async function prepare(body: Record<string, unknown>) {
   const token = String(body.token || ""),
@@ -236,7 +224,7 @@ export async function prepareDeploy(body: Record<string, unknown>) {
     throw Error("Use 2–8 letters or digits; RTM and RTD are reserved here.");
   if (!/^[1-9][0-9]{0,14}$/.test(supply))
     throw Error("Supply must be a positive whole number, up to 15 digits.");
-  const bytes = await readFile(
+  const bytes = await readAsset(
     path.join(process.cwd(), "public/contracts/meme_token.wasm"),
   );
   if (
@@ -352,38 +340,10 @@ export type DexJob = {
 };
 type Store = { jobs: Record<string, DexJob> };
 async function store<T>(fn: (s: Store) => T | Promise<T>): Promise<T> {
-  await mkdir(directory, { recursive: true });
-  const lock = path.join(directory, ".dex-lock");
-  let held = false;
-  for (let i = 0; i < 40; i++) {
-    try {
-      await mkdir(lock);
-      held = true;
-      break;
-    } catch (e) {
-      if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
-      await new Promise((r) => setTimeout(r, 50));
-    }
-  }
-  if (!held) throw Error("DEX storage busy. Try again.");
-  try {
-    let s: Store;
-    try {
-      s = JSON.parse(
-        await readFile(path.join(directory, "dex-transactions.json"), "utf8"),
-      );
-    } catch (e) {
-      if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
-      s = { jobs: {} };
-    }
-    const result = await fn(s),
-      tmp = path.join(directory, `dex-${randomBytes(8).toString("hex")}.tmp`);
-    await writeFile(tmp, JSON.stringify(s), { mode: 0o600 });
-    await rename(tmp, path.join(directory, "dex-transactions.json"));
-    return result;
-  } finally {
-    await rmdir(lock);
-  }
+  return withDocument(path.join(directory, "dex-transactions.json"), () => ({ jobs: {} } as Store), async (state: Store) => {
+    if (!state.jobs || typeof state.jobs !== "object") throw Error("Invalid DEX storage");
+    return fn(state);
+  });
 }
 export async function register(ticket: string, txId: string, wallet: string) {
   if (!/^tx_[0-9a-f]{32}$/.test(txId) || ticket.length > 10000)

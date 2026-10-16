@@ -5,7 +5,7 @@ import {
   job as dexJob,
 } from "../../../lib/dex/server";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-import { mkdir, readFile, rename, rmdir, writeFile } from "node:fs/promises";
+import { readData as readFile, withDocument } from "../../../lib/storage/store.mjs";
 import path from "node:path";
 import { NextResponse } from "next/server";
 import { blake3 } from "@noble/hashes/blake3.js";
@@ -121,7 +121,6 @@ class PaymentError extends Error {
 
 const dataDirectory = path.join(process.cwd(), "data");
 const statePath = path.join(dataDirectory, "payments.json");
-const lockPath = path.join(dataDirectory, ".payments-lock");
 const cookieName = "retium_payment_challenge";
 const encoder = new TextEncoder();
 
@@ -221,38 +220,8 @@ async function readLinks(): Promise<Record<string, WalletLink>> {
 }
 
 async function withState<T>(action: (state: State) => Promise<T>): Promise<T> {
-  await mkdir(dataDirectory, { recursive: true });
-
-  let acquired = false;
-
-  for (let attempt = 0; attempt < 50; attempt++) {
-    try {
-      await mkdir(lockPath);
-      acquired = true;
-      break;
-    } catch (error) {
-      if (getErrorCode(error) !== "EEXIST") throw error;
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-  }
-
-  if (!acquired) {
-    throw new PaymentError("Payment storage is busy. Try again.", 503);
-  }
-
-  try {
-    let state: State;
-
-    try {
-      state = JSON.parse(await readFile(statePath, "utf8"));
-      if (!state.challenges || !state.payments) {
-        throw new Error("Invalid payment storage");
-      }
-    } catch (error) {
-      if (getErrorCode(error) !== "ENOENT") throw error;
-      state = { challenges: {}, payments: {} };
-    }
-
+  return withDocument(statePath, () => ({ challenges: {}, payments: {} } as State), async (state: State) => {
+    if (!state.challenges || !state.payments) throw new Error("Invalid payment storage");
     for (const [id, challenge] of Object.entries(state.challenges)) {
       if (challenge.expiresAt <= Date.now()) {
         delete state.challenges[id];
@@ -273,18 +242,8 @@ async function withState<T>(action: (state: State) => Promise<T>): Promise<T> {
       if (challenge.expiresAt <= Date.now()) delete state.payChallenges[key];
     }
     const result = await action(state);
-    const temporaryPath = `${statePath}.${randomBytes(8).toString("hex")}.tmp`;
-
-    await writeFile(temporaryPath, JSON.stringify(state, null, 2), {
-      encoding: "utf8",
-      mode: 0o600,
-    });
-    await rename(temporaryPath, statePath);
-
     return result;
-  } finally {
-    await rmdir(lockPath);
-  }
+  });
 }
 
 function challengeStatement(challenge: {
@@ -1962,3 +1921,5 @@ async function handleWorkerTick(request: Request) {
     { headers: { "Cache-Control": "no-store" } },
   );
 }
+
+export const maxDuration = 60;

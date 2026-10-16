@@ -1,5 +1,5 @@
-import { createHash, randomBytes } from "node:crypto";
-import { mkdir, open, readFile, rename, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { stableSecret, saveData } from "../src/lib/storage/store.mjs";
 import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -30,21 +30,12 @@ process.on("SIGTERM", stop);
 
 async function saveStatus() {
   state.lastSeenAt = Date.now();
-  const temp = `${statusPath}.${randomBytes(6).toString("hex")}.tmp`;
-  await writeFile(temp, JSON.stringify(state), { encoding: "utf8", mode: 0o600 });
-  await rename(temp, statusPath);
+  await saveData(statusPath, state);
 }
 async function readKey() {
-  await mkdir(dataDir, { recursive: true });
-  try {
-    const file = await open(keyPath, "wx", 0o600);
-    try { await file.writeFile(randomBytes(32).toString("hex"), "utf8"); await file.sync(); }
-    finally { await file.close(); }
-  } catch (error) { if (error?.code !== "EEXIST") throw error; }
-  const key = (await readFile(keyPath, "utf8")).trim();
-  if (!/^[0-9a-f]{64}$/.test(key)) throw new Error("Worker key file is invalid. Do not edit it manually.");
-  return key;
+  return stableSecret(keyPath);
 }
+
 async function main() {
   await new Promise((resolve, reject) => {
     guard.once("error", reject);

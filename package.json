@@ -6,14 +6,19 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:import": "node --env-file=.env.local scripts/prepare-vercel.mjs --import",
+    "check:deploy": "node --env-file=.env.local scripts/prepare-vercel.mjs",
+    "bot:telegram": "node --env-file=.env.local scripts/telegram-bot.mjs",
+    "worker": "node --env-file=.env.local scripts/payments-worker.mjs"
   },
   "dependencies": {
     "@noble/hashes": "^2.4.0",
     "@noble/post-quantum": "^0.7.1",
     "next": "16.4.1",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "pg": "^8.23.1"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",
@@ -23,6 +28,10 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.1",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "@types/pg": "^8.23.1"
+  },
+  "engines": {
+    "node": "24.x"
   }
 }
