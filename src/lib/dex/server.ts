@@ -1,4 +1,4 @@
-import { parseReviewSnapshot } from "./review-input";
+import { parseReviewSnapshot, parseDeploymentAccount } from "./review-input";
 import { blake3 } from "@noble/hashes/blake3.js";
 import {
   createHash,
@@ -269,7 +269,9 @@ export async function prepareDeploy(body: Record<string, unknown>) {
       ]),
     ),
   ).toString("hex");
-  const account = await rpcRead(`wallet/${wallet}`);
+  const account = body.accountSnapshot === undefined
+    ? await rpcRead(`wallet/${wallet}`)
+    : parseDeploymentAccount(body.accountSnapshot, wallet, Date.now());
   if (!Number.isSafeInteger(account.nonce) || account.nonce < 0)
     throw Error("Invalid wallet nonce.");
   if (decimalAtomic(String(account.spendable ?? account.balance_rtm)) < UNIT)
@@ -366,14 +368,18 @@ export async function register(ticket: string, txId: string, wallet: string) {
   const plan = JSON.parse(
     Buffer.from(payload, "base64url").toString("utf8"),
   ) as Plan;
-  if (plan.wallet !== wallet || Date.now() > plan.deadline + 3600_000)
-    throw Error("Preview does not belong to this wallet or has expired.");
+  if (plan.wallet !== wallet)
+    throw Error("Preview does not belong to this wallet.");
   return store((s) => {
     if (s.jobs[txId]) {
       if (s.jobs[txId].wallet !== wallet)
         throw Error("Transaction already registered.");
       return s.jobs[txId];
     }
+    // Expiry blocks NEW registrations, not reading an already-saved TX.
+    // The HMAC, authenticated wallet and existing job ownership were checked above.
+    if (Date.now() > plan.deadline + 3600_000)
+      throw Error("Preview has expired. This TX has not been registered.");
     if (
       Object.values(s.jobs).filter(
         (j) => j.wallet === wallet && j.state === "pending",

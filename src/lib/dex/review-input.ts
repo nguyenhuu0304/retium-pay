@@ -25,3 +25,15 @@ export function parseReviewSnapshot(value: unknown, token: string, wallet: strin
     balanceRtm: atomic(s.balanceRtm), balanceToken: atomic(s.balanceToken), allowance: atomic(s.allowance),
     lp, locked, untilMs: s.untilMs, nonce: s.nonce };
 }
+
+export function parseDeploymentAccount(value: unknown, wallet: string, now: number) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw Error("Invalid deployment review input.");
+  const s = value as Record<string, unknown>;
+  if (s.wallet !== wallet) throw Error("Deployment wallet changed.");
+  if (typeof s.readAt !== "number" || !Number.isSafeInteger(s.readAt) || s.readAt > now + 5000 || now - s.readAt > 30000)
+    throw Error("Review data expired. Refresh and try again.");
+  if (typeof s.nonce !== "number" || !Number.isSafeInteger(s.nonce) || s.nonce < 0)
+    throw Error("Invalid wallet nonce.");
+  if (typeof s.spendable !== "string") throw Error("Invalid wallet balance.");
+  return { nonce: s.nonce, spendable: s.spendable };
+}

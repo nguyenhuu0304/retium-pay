@@ -1,4 +1,5 @@
 "use client";
+import { deploymentAccount } from "../../lib/dex/deploy-browser";
 import { CopyValue } from "../../components/copy-value";
 import { UiText, UiInput } from "../../components/preferences";
 
@@ -195,8 +196,10 @@ export default function Deploy() {
     void action(async () => {
       setPreview(null);
       setAgreed(false);
+      const accountSnapshot = await deploymentAccount(wallet);
       const d = await post("/api/dex", {
         operation: "prepareDeploy",
+        accountSnapshot,
         wallet,
         name,
         symbol,
