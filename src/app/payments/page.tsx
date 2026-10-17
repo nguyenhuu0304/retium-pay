@@ -1,4 +1,5 @@
 "use client";
+import { readPayerNonce } from "../../lib/payments/browser";
 import {
   MemberIdentity,
   type TelegramName,
@@ -61,6 +62,7 @@ function describeError(error: unknown) {
 }
 async function api(body: Record<string, unknown>) {
   const response = await fetch("/api/payments", {
+    signal: AbortSignal.timeout(30000),
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -246,7 +248,10 @@ export default function PaymentsPage() {
     if (!payment || !begin()) return;
     setPayChallenge(null);
     try {
-      const data = await api({ action: "preparePay", id: payment.id });
+      if (address !== payment.payer) throw Error("Connect the requested payer wallet first.");
+      // Existing attempts restore checking with their saved nonce; never enable a second send.
+      const payerSnapshot = payment.paymentPhase ? undefined : await readPayerNonce(payment.payer);
+      const data = await api({ action: "preparePay", id: payment.id, payerSnapshot });
       setPayChallenge({ nonce: data.nonce, statement: data.statement });
       setNotice(
         data.recovery

@@ -1,3 +1,4 @@
+import { payerNonce } from "../../../lib/payments/payer-nonce";
 import {
   dexTick,
   queueSummary as dexQueueSummary,
@@ -1022,7 +1023,11 @@ async function handlePay(
     }
     let expectedNonce = snapshot.attempt?.expectedNonce;
     if (expectedNonce === undefined) {
-      const wallet = await rpcRead(`/api/wallet/${snapshot.payer}`);
+      // Browser data selects the signed intent nonce only. Railway independently checks
+      // the actual transfer (including this nonce) before recording paid or notifying.
+      const wallet = body.payerSnapshot !== undefined
+        ? { nonce: payerNonce(body.payerSnapshot, snapshot.payer) }
+        : await rpcRead(`/api/wallet/${snapshot.payer}`);
       if (
         !wallet ||
         typeof wallet.nonce !== "number" ||
