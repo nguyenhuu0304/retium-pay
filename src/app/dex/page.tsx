@@ -7,7 +7,7 @@ import {
   WalletRequired,
 } from "../../components/shared-wallet";
 import { assessFunding } from "../../lib/dex/funding";
-import { tokenPage, marketSummary } from "../../lib/dex/browser";
+import { tokenPage, marketSummary, reviewSnapshot } from "../../lib/dex/browser";
 import Link from "next/link";
 import "./dex.css";
 import { useEffect, useRef, useState } from "react";
@@ -393,8 +393,11 @@ export default function DexPage() {
         bps = Math.round(percent * 100);
       if (!Number.isFinite(percent) || Math.abs(percent * 100 - bps) > 0.00001)
         throw Error("Use a slippage value with at most two decimals.");
+      const snapshot = await reviewSnapshot(token, wallet);
+      if (revision !== epoch.current) return;
       const d = await post("/api/dex", {
         operation: "prepare",
+        reviewSnapshot: snapshot,
         wallet,
         token,
         action,
@@ -412,7 +415,7 @@ export default function DexPage() {
       setNotice(
         d.plan.approval
           ? "Token approval is required first. The next signature approves only the displayed amount."
-          : "Review the exact contract, arguments and minimum amounts before signing.",
+          : "Review the exact contract, arguments and minimum amounts before signing. Network data was read by your browser; settlement will be verified separately.",
       );
     } catch (e) {
       const error = message(e);
@@ -479,7 +482,7 @@ export default function DexPage() {
       try {
         await save(recovery);
         setNotice(
-          "TX saved. Keep the web server and Background monitor running. You may close this tab.",
+          "TX submitted and saved — awaiting independent verification. Do not send again. Telegram confirmation follows only after verification.",
         );
       } catch (e) {
         setNotice(

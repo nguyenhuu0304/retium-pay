@@ -1,3 +1,4 @@
+import { parseReviewSnapshot } from "./review-input";
 import { blake3 } from "@noble/hashes/blake3.js";
 import {
   createHash,
@@ -161,7 +162,11 @@ export async function prepare(body: Record<string, unknown>) {
     wallet = String(body.wallet || "");
   if (!/^[0-9a-f]{64}$/.test(token) || !/^rete[0-9a-f]{68}$/.test(wallet))
     throw Error("Enter a token contract and connect a Retium wallet.");
-  const m = await market(token, wallet);
+  // A ticket authorizes tracking this intent, not trusting browser balances or finality.
+  // Contract execution and independent TX verification remain authoritative.
+  const m = body.reviewSnapshot === undefined
+    ? await market(token, wallet)
+    : parseReviewSnapshot(body.reviewSnapshot, token, wallet, Date.now());
   const plan = makePlan({
     wallet,
     token,

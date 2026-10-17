@@ -421,5 +421,7 @@
   "Awaiting payment": "Đang chờ thanh toán",
   "payers": "người trả",
   "Total": "Tổng",
-  "Transaction review is unavailable. No transaction has been sent. Please try again later.": "Hiện chưa thể kiểm tra giao dịch. Chưa có giao dịch nào được gửi. Vui lòng thử lại sau."
+  "Transaction review is unavailable. No transaction has been sent. Please try again later.": "Hiện chưa thể kiểm tra giao dịch. Chưa có giao dịch nào được gửi. Vui lòng thử lại sau.",
+  "Review the exact contract, arguments and minimum amounts before signing. Network data was read by your browser; settlement will be verified separately.": "Kiểm tra hợp đồng, tham số và số lượng tối thiểu trước khi ký. Dữ liệu được đọc từ trình duyệt; kết quả sẽ được xác minh riêng.",
+  "TX submitted and saved — awaiting independent verification. Do not send again. Telegram confirmation follows only after verification.": "Đã gửi và lưu TX — đang chờ xác minh độc lập. Không gửi lại. Telegram chỉ báo thành công sau khi xác minh."
 }

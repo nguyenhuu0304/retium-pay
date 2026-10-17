@@ -1,4 +1,4 @@
-// Public market display only; transaction review and payment validation stay on the server.
+// Public RPC reads supply review inputs; only independent backend reads can confirm settlement.
 import { publicRead } from "../rpc/public-read";
 import { DEX, atomic, decimalAtomic, type Pool } from "./math";
 let nextReadAt = 0;
@@ -193,5 +193,19 @@ export async function marketSummary(token: string, wallet: string) {
     balanceRtm: m.balanceRtm.toString(),
     balanceToken: m.balanceToken.toString(),
     readAt: Date.now(),
+  };
+}
+
+// This is a review input, never proof that a transaction succeeded.
+export async function reviewSnapshot(token: string, wallet: string) {
+  if (!/^[0-9a-f]{64}$/.test(token) || !/^rete[0-9a-f]{68}$/.test(wallet))
+    throw Error("Select a token and connect a wallet.");
+  const m = await market(token, wallet);
+  return {
+    token, wallet, symbol: m.info.symbol, codeHash: m.info.codeHash,
+    pool: m.pool, balanceRtm: m.balanceRtm.toString(),
+    balanceToken: m.balanceToken.toString(), allowance: m.allowance.toString(),
+    lp: m.lp.toString(), locked: m.locked.toString(), untilMs: m.untilMs,
+    nonce: m.nonce, readAt: Date.now(),
   };
 }
