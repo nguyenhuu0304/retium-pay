@@ -1,4 +1,6 @@
 "use client";
+
+import { withDeadline } from "../../lib/dex/request-state";
 import { CopyValue } from "../../components/copy-value";
 import { UiText, UiInput } from "../../components/preferences";
 
@@ -81,6 +83,7 @@ async function post(url: string, body: Record<string, unknown>) {
     body: JSON.stringify(body),
     cache: "no-store",
     keepalive: body.operation === "dexRegister",
+    signal: AbortSignal.timeout(30000),
   });
   const d = await r.json();
   if (!r.ok) throw Error(d.error || "Request failed.");
@@ -393,7 +396,11 @@ export default function DexPage() {
         bps = Math.round(percent * 100);
       if (!Number.isFinite(percent) || Math.abs(percent * 100 - bps) > 0.00001)
         throw Error("Use a slippage value with at most two decimals.");
-      const snapshot = await reviewSnapshot(token, wallet);
+      const snapshot = await withDeadline(
+        () => reviewSnapshot(token, wallet),
+        45000,
+        "Review timed out. No transaction was sent. Edit the amount and try again.",
+      );
       if (revision !== epoch.current) return;
       const d = await post("/api/dex", {
         operation: "prepare",
@@ -418,7 +425,14 @@ export default function DexPage() {
           : "Review the exact contract, arguments and minimum amounts before signing. Network data was read by your browser; settlement will be verified separately.",
       );
     } catch (e) {
-      const error = message(e);
+      // Review never submits a chain transaction. Always release its UI lock on failure.
+      running.current = false;
+      setBusy(false);
+      setPreview(null);
+      setConfirmed(false);
+      const error = /TimeoutError|AbortError/.test(e instanceof Error ? e.name : "")
+        ? "Review timed out. No transaction was sent. Edit the amount and try again."
+        : message(e);
       setNotice(/403|Unexpected token|invalid JSON/i.test(error)
         ? "Transaction review is unavailable. No transaction has been sent. Please try again later."
         : error);
