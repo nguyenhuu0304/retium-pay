@@ -250,7 +250,9 @@ export default function PaymentsPage() {
     try {
       if (address !== payment.payer) throw Error("Connect the requested payer wallet first.");
       // Existing attempts restore checking with their saved nonce; never enable a second send.
-      const payerSnapshot = payment.paymentPhase ? undefined : await readPayerNonce(payment.payer);
+      const payerSnapshot = ["reserved", "submitted", "review", "paid"].includes(payment.paymentPhase || "")
+        ? undefined
+        : await readPayerNonce(payment.payer);
       const data = await api({ action: "preparePay", id: payment.id, payerSnapshot });
       setPayChallenge({ nonce: data.nonce, statement: data.statement });
       setNotice(
