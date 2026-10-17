@@ -1,5 +1,6 @@
 import {
   dexTick,
+  queueSummary as dexQueueSummary,
   identity as dexIdentity,
   register as dexRegister,
   job as dexJob,
@@ -513,7 +514,8 @@ export async function POST(request: Request) {
         const wallet = await dexIdentity(request),
           txId = String(body.txId || "");
         await dexJob(txId, wallet); // Ownership must be checked before any RPC or notification work.
-        await dexTick({ txId, wallet });
+        // Let an online independent worker own RPC checks; browser polls its shared result.
+        if (!(await workerStatus()).online) await dexTick({ txId, wallet });
         return NextResponse.json(
           { job: await dexJob(txId, wallet) },
           { headers: { "Cache-Control": "no-store" } },
@@ -1917,6 +1919,7 @@ async function handleWorkerTick(request: Request) {
       rpcError,
       retryAfterMs,
       ...counts,
+      ...await dexQueueSummary(),
     },
     { headers: { "Cache-Control": "no-store" } },
   );

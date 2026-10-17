@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { stableSecret, saveData } from "../src/lib/storage/store.mjs";
+import { stableSecret, saveData, closeStorage } from "../src/lib/storage/store.mjs";
 import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,6 +10,11 @@ const dataDir = path.join(project, "data");
 const keyPath = path.join(dataDir, "payments-worker.key");
 const statusPath = path.join(dataDir, "payments-worker-status.json");
 const once = process.argv.includes("--once");
+// A shared database lets a trusted worker verify independently of Vercel RPC.
+if (process.argv.includes("--direct") && !process.env.DATABASE_URL?.trim()) {
+  throw new Error("Direct verification requires DATABASE_URL in .env.local, using the same database as Vercel.");
+}
+const direct = process.argv.includes("--direct") || (Boolean(process.env.DATABASE_URL?.trim()) && process.env.RETIUM_WORKER_MODE !== "http");
 const endpoint = new URL("/api/payments", process.env.APP_URL || "http://localhost:3000");
 if (!["http:", "https:"].includes(endpoint.protocol) || endpoint.username || endpoint.password) {
   throw new Error("APP_URL must be a valid HTTP(S) application URL.");
@@ -41,16 +46,21 @@ async function main() {
     guard.once("error", reject);
     guard.listen({ host: "127.0.0.1", port: guardPort, exclusive: true }, resolve);
   });
+  process.chdir(project);
   const key = await readKey();
+  const directTick = direct
+    ? await (await import("./direct-verifier.mjs")).createDirectVerifier(project)
+    : null;
   let failures = 0;
   let lastSummary = "";
-  log("Online. Watches saved payment TX IDs only; never signs or sends RTM.");
+  log(direct ? "Direct verifier online. Shared database; RPC read from this worker host. No local web server required." : "HTTP worker online.");
+  log("Watches saved payment and DEX TX IDs only; never signs or sends funds.");
   await saveStatus();
   try {
     do {
       let delay = 15_000;
       try {
-        const response = await fetch(endpoint, {
+        const response = directTick ? await directTick(key) : await fetch(endpoint, {
           method: "POST", redirect: "error",
           headers: { "Content-Type": "application/json", "X-Retium-Worker-Key": key },
           body: JSON.stringify({ action: "workerTick" }), signal: AbortSignal.timeout(50_000),
@@ -67,7 +77,9 @@ async function main() {
         state.pending = result.pending ?? 0;
         state.needsReview = result.needsReview ?? 0;
         state.pendingNotices = result.pendingNotices ?? 0;
-        const summary = `Pending TX: ${state.pending}; needs review: ${state.needsReview}; pending confirmations: ${state.pendingNotices}.`;
+        state.dexPending = result.dexPending ?? 0;
+        state.dexPendingNotices = result.dexPendingNotices ?? 0;
+        const summary = `Pending TX: ${state.pending}; needs review: ${state.needsReview}; pending confirmations: ${state.pendingNotices}; DEX pending: ${state.dexPending}; DEX notices: ${state.dexPendingNotices}.`;
         if (summary !== lastSummary || result.checked) { log(summary); lastSummary = summary; }
         if (result.rpcError) log("RPC check failed. Retrying later without confirming or resending payment.");
       } catch (error) {
@@ -75,7 +87,7 @@ async function main() {
         delay = Math.min(60_000, 15_000 * 2 ** Math.min(failures - 1, 2));
         state.lastError = "Application unreachable or check failed; no payment confirmed.";
         if (error?.fatal) { log(error.message); process.exitCode = 1; break; }
-        log(`Local application unavailable or check failed. Retry in ${delay / 1000}s.`);
+        log(`Verification unavailable or check failed. Retry in ${delay / 1000}s.`);
         if (once) process.exitCode = 1;
       }
       await saveStatus();
@@ -92,4 +104,5 @@ main().catch((error) => {
   log(error?.code === "EADDRINUSE" ? "Another payments worker for this project is already running, or its local guard port is occupied." : "Could not start the worker. Check the project folder and data permissions.");
 }).finally(() => {
   if (guard.listening) guard.close();
+  return closeStorage();
 });

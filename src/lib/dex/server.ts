@@ -706,3 +706,10 @@ export async function marketSummary(token: string, wallet: string) {
     readAt: Date.now(),
   };
 }
+
+export async function queueSummary() {
+  return store((s) => ({
+    dexPending: Object.values(s.jobs).filter(j => j.state === "pending").length,
+    dexPendingNotices: Object.values(s.jobs).filter(j => j.state !== "pending" && j.notice === "pending").length,
+  }));
+}
