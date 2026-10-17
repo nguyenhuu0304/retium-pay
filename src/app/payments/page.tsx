@@ -96,7 +96,7 @@ function rememberTx(id: string, txId: string) {
 }
 
 export default function PaymentsPage() {
-  const { account } = useSharedWallet();
+  const { account, connect, busy: walletBusy, ready: walletReady, notice: walletNotice } = useSharedWallet();
   const address = account?.address || "";
   const [payer, setPayer] = useState("");
   const [amount, setAmount] = useState("");
@@ -632,12 +632,18 @@ export default function PaymentsPage() {
                             <UiText text="This request can only be paid from the requested wallet:" />{" "}
                             <CopyValue value={payment.payer} compact />
                           </p>
-                          <Link className="button secondary" href="/">
-                            <UiText text="Change wallet on Dashboard" />
-                          </Link>
+                          <button
+                            type="button"
+                            className="button secondary"
+                            disabled={!walletReady || walletBusy || busy}
+                            onClick={() => void connect()}
+                          >
+                            <UiText text={walletBusy ? "Please wait…" : address ? "Change payer wallet here" : "Connect payer wallet here"} />
+                          </button>
                           <p>
-                            <UiText text="After changing wallets, reopen this request link. No payment has been sent by this page." />
+                            <UiText text="Connect on this page, then verify the payer and approve Pay. No Dashboard visit is needed." />
                           </p>
+                          {walletNotice && <p role="status"><UiText text={walletNotice} /></p>}
                         </div>
                       )}
                       {address === payment.payer && (

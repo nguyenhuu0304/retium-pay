@@ -1,5 +1,6 @@
 "use client";
 import { UiText } from "./preferences";
+import { parseRememberedWallet } from "../lib/ui/remembered-wallet";
 
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import Script from "next/script";
@@ -29,23 +30,38 @@ export function SharedWalletProvider({
   const lock = useRef(false);
   useEffect(() => {
     let live = true;
+    function restore(raw: string | null) {
+      if (!live) return;
+      const next = parseRememberedWallet(raw);
+      setAccount(next);
+      setRemembered(!!next);
+    }
     Promise.resolve().then(() => {
       try {
-        const raw = sessionStorage.getItem(storage);
-        if (raw) {
-          const a = JSON.parse(raw);
-          if (/^rete[0-9a-f]{68}$/.test(a.address) && a.chainId === 3 && live) {
-            setAccount(a);
-            setRemembered(true);
+        let raw = localStorage.getItem(storage);
+        // Migrate the previous tab-only selection once. A stored "null" records disconnect.
+        if (raw === null) {
+          const legacy = sessionStorage.getItem(storage);
+          if (parseRememberedWallet(legacy)) {
+            raw = legacy;
+            localStorage.setItem(storage, raw!);
           }
         }
+        restore(raw);
       } catch {
-        /* A remembered address is optional, never authentication. */
+        try { restore(sessionStorage.getItem(storage)); } catch {}
       }
       if (live) setReady(true);
     });
+    const changed = (event: StorageEvent) => {
+      if (event.key !== storage && event.key !== null) return;
+      try { sessionStorage.removeItem(storage); } catch {}
+      restore(event.key === null ? null : event.newValue);
+    };
+    window.addEventListener("storage", changed);
     return () => {
       live = false;
+      window.removeEventListener("storage", changed);
     };
   }, []);
   async function logout() {
@@ -80,6 +96,7 @@ export function SharedWalletProvider({
       setAccount(next);
       setRemembered(false);
       try {
+        localStorage.setItem(storage, JSON.stringify(next));
         sessionStorage.setItem(storage, JSON.stringify(next));
       } catch {
         /* In-memory connection still works. */
@@ -105,6 +122,7 @@ export function SharedWalletProvider({
     try {
       await logout();
       try {
+        localStorage.setItem(storage, "null");
         sessionStorage.removeItem(storage);
       } catch {}
       setAccount(null);
@@ -129,7 +147,7 @@ export function SharedWalletProvider({
         crossOrigin="anonymous"
         strategy="afterInteractive"
         onError={() =>
-          setNotice("Could not load Web Wallet. Refresh the Dashboard.")
+          setNotice("Could not load Web Wallet. Refresh this page.")
         }
       />
       <div key={account?.address || "disconnected"}>{children}</div>
