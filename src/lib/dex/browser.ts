@@ -1,3 +1,4 @@
+import { readPool } from "./pool-read";
 // Public RPC reads supply review inputs; only independent backend reads can confirm settlement.
 import { publicRead } from "../rpc/public-read";
 import { DEX, atomic, decimalAtomic, type Pool } from "./math";
@@ -87,17 +88,7 @@ export async function tokenInfo(token: string) {
 }
 export async function market(token: string, wallet: string) {
   const info = await tokenInfo(token);
-  let pool: Pool | null = null;
-  try {
-    const p = JSON.parse(await query(DEX, "get_pool", [token]));
-    if (p.token_b !== token) throw Error("Wrong pool returned.");
-    atomic(p.reserve_rtm);
-    atomic(p.reserve_token);
-    atomic(p.lp_supply);
-    pool = p;
-  } catch (e) {
-    if (!(e instanceof Error) || !/Pool not found/i.test(e.message)) throw e;
-  }
+  const pool = await readPool(query, token);
   const account = await rpcRead(`wallet/${wallet}`);
   const balanceToken = atomic(await query(token, "balance_of", [wallet]));
   const allowance = atomic(await query(token, "allowance", [wallet, DEX]));

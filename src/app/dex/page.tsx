@@ -1139,6 +1139,14 @@ export default function DexPage() {
             {<UiText text={"Pool fee 0.3%. The network fee is separate."} />}
           </p>
         )}
+        {activeMarket && !activeMarket.pool && action !== "create" && (
+          <div className="dex-muted" role="status">
+            <p><UiText text="This token has no liquidity pool. Create a pool before swapping or adding liquidity." /></p>
+            <button type="button" disabled={blocked} onClick={() => { change(); setAction("create"); }}>
+              <UiText text="Create pool" />
+            </button>
+          </div>
+        )}
         <button
           className="primary-action"
           disabled={blocked || !wallet || !!funding?.insufficient}
