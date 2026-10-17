@@ -428,5 +428,11 @@
   "Connect payer wallet here": "Kết nối ví thanh toán tại đây",
   "Change payer wallet here": "Đổi ví thanh toán tại đây",
   "Connect on this page, then verify the payer and approve Pay. No Dashboard visit is needed.": "Kết nối ngay tại trang này, sau đó xác minh người trả và duyệt thanh toán. Không cần quay về Dashboard.",
-  "Could not load Web Wallet. Refresh this page.": "Không tải được Web Wallet. Hãy tải lại trang này."
+  "Could not load Web Wallet. Refresh this page.": "Không tải được Web Wallet. Hãy tải lại trang này.",
+  "Token approval step": "Bước cấp quyền token",
+  "✓ Token approval confirmed": "✓ Đã cấp quyền token",
+  "Approval confirmed · HardFinal": "Đã cấp quyền · HardFinal",
+  "Continue — review next transaction": "Tiếp tục — kiểm tra giao dịch kế tiếp",
+  "Token approval confirmed. No tokens were swapped. Continue to review the swap or liquidity action.": "Đã cấp quyền token. Chưa hoán đổi token. Tiếp tục kiểm tra lệnh swap hoặc thanh khoản.",
+  "Approval is confirmed but the available allowance is still insufficient. Refresh and check again; do not approve repeatedly.": "Đã xác nhận cấp quyền nhưng quyền khả dụng vẫn chưa đủ. Hãy tải lại dữ liệu và kiểm tra; không ký cấp quyền lặp lại."
 }

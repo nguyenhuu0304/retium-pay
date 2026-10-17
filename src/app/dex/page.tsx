@@ -89,6 +89,9 @@ async function post(url: string, body: Record<string, unknown>) {
   if (!r.ok) throw Error(d.error || "Request failed.");
   return d;
 }
+const completionNotice = (plan: Plan) => plan.approval
+  ? "Token approval confirmed. No tokens were swapped. Continue to review the swap or liquidity action."
+  : "Completed — HardFinal, execution successful. No further transaction is needed.";
 const recoveryKey = "retium-pay:dex-pending:v1";
 function AmountPresets({
   disabled,
@@ -256,7 +259,7 @@ export default function DexPage() {
         setJob(data.job);
         if (data.job.state === "confirmed")
           setNotice(
-            "Completed — HardFinal, execution successful. No further transaction is needed.",
+            completionNotice(data.job.plan),
           );
         else if (data.job.state === "failed")
           setNotice(
@@ -385,7 +388,7 @@ export default function DexPage() {
     setSelectedSymbol(item.symbol);
     setPicker(false);
   }
-  async function prepare() {
+  async function prepare(afterApproval = false) {
     if (running.current) return;
     running.current = true;
     setBusy(true);
@@ -416,6 +419,8 @@ export default function DexPage() {
         bps,
       });
       if (revision !== epoch.current) return;
+      if (afterApproval && d.plan.approval)
+        throw Error("Approval is confirmed but the available allowance is still insufficient. Refresh and check again; do not approve repeatedly.");
       setPreview(d);
       setMarketData({ ...d.market, token, wallet, readAt: d.plan.createdAt });
       setSelectedSymbol(d.market.symbol);
@@ -534,9 +539,11 @@ export default function DexPage() {
       });
       setJob(d.job);
       setNotice(
-        d.job.state === "pending"
-          ? "Awaiting chain confirmation. The Background monitor checks this TX."
-          : `${d.job.state}. ${d.job.error || ""}`,
+        d.job.state === "confirmed"
+          ? completionNotice(d.job.plan)
+          : d.job.state === "pending"
+            ? "Awaiting chain confirmation. The Background monitor checks this TX."
+            : `${d.job.state}. ${d.job.error || ""}`,
       );
     } catch (e) {
       setNotice(message(e));
@@ -546,13 +553,18 @@ export default function DexPage() {
   }
   function finish() {
     if (!job || !["confirmed", "failed"].includes(job.state)) return;
+    const continueAfterApproval = job.state === "confirmed" && job.plan.approval;
     localStorage.removeItem(recoveryKey);
     setPending(null);
     setJob(null);
     change();
-    setNotice(
-      "Previous TX is final. Refresh the preview for your next action.",
-    );
+    setMarketVersion((value) => value + 1);
+    if (continueAfterApproval) {
+      // Read fresh allowance and build the next preview only. Never open/sign the wallet automatically.
+      void prepare(true);
+    } else {
+      setNotice("Previous TX is final. Refresh the preview for your next action.");
+    }
   }
   const blocked = busy || !!pending || unknown;
   const activeMarket =
@@ -742,7 +754,7 @@ export default function DexPage() {
       {stage !== "form" && (
         <div className="dex-stage-context">
           <span>
-            <UiText text={"Current request"} /> ·{" "}
+            <UiText text={job?.plan.approval || preview?.plan.approval ? "Token approval step" : "Current request"} /> ·{" "}
             {action === "swap" ? (
               <>
                 {amount} {paySymbol} → {receiveSymbol}
@@ -1317,7 +1329,7 @@ export default function DexPage() {
         <section className="dex-card transaction-card">
           <h2>
             {job?.state === "confirmed" ? (
-              <UiText text={"✓ Completed"} />
+              <UiText text={job.plan.approval ? "✓ Token approval confirmed" : "✓ Completed"} />
             ) : job?.state === "failed" ? (
               <UiText text={"Transaction failed"} />
             ) : (
@@ -1337,7 +1349,7 @@ export default function DexPage() {
                 {<UiText text={"Status:"} />}{" "}
                 <b>
                   {job.state === "confirmed" ? (
-                    <UiText text={"Completed · HardFinal"} />
+                    <UiText text={job.plan.approval ? "Approval confirmed · HardFinal" : "Completed · HardFinal"} />
                   ) : job.state === "pending" ? (
                     <UiText text={"Confirming…"} />
                   ) : (
@@ -1350,7 +1362,7 @@ export default function DexPage() {
               <p>{job.error}</p>
               {["confirmed", "failed"].includes(job.state) && (
                 <button onClick={finish}>
-                  {<UiText text={"Done — return to form"} />}
+                  {<UiText text={job.state === "confirmed" && job.plan.approval ? "Continue — review next transaction" : "Done — return to form"} />}
                 </button>
               )}
             </>
