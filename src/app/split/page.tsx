@@ -40,6 +40,7 @@ type Payment = {
   payerTelegram?: TelegramName;
   amountRtm: string;
   notification: string;
+  notifyTelegram?: boolean;
   splitBillId: string;
   status: string;
 };
@@ -658,7 +659,7 @@ export default function SplitBill() {
                                   ...m,
                                   name,
                                   ...(found
-                                    ? { payer: found.address, telegram: "" }
+                                    ? { payer: found.address, telegram: found.address.toLowerCase() === m.payer.trim().toLowerCase() ? m.telegram : "" }
                                     : {}),
                                 }
                               : m,
@@ -734,7 +735,7 @@ export default function SplitBill() {
                         setMembers(
                           members.map((m, j) =>
                             j === i
-                              ? { ...m, payer: e.target.value, telegram: "" }
+                              ? { ...m, payer: e.target.value, telegram: e.target.value.trim().toLowerCase() === m.payer.trim().toLowerCase() ? m.telegram : "" }
                               : m,
                           ),
                         )
@@ -843,7 +844,7 @@ export default function SplitBill() {
                 telegram={p.payerTelegram}
                 address={p.payer}
               />{" "}
-              — {p.amountRtm} RTM
+              — {p.amountRtm} RTM · <UiText text={p.notifyTelegram ? "Telegram notification enabled" : "Payment link only — Telegram is optional"} />
             </p>
           ))}
           <p>

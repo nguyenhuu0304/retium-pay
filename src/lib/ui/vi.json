@@ -466,5 +466,19 @@
   "RETIUM PAY · TESTNET": "RETIUM PAY · MẠNG THỬ NGHIỆM",
   "Saved TXs are verified in the background. You can close this page. Testnet only.": "TX đã lưu được xác minh nền. Bạn có thể đóng trang này. Chỉ dùng trên testnet.",
   "Too many requests for this filter. Select a specific status.": "Có quá nhiều yêu cầu cho bộ lọc này. Hãy chọn trạng thái cụ thể.",
-  "Could not load the complete unpaid list.": "Không tải được toàn bộ danh sách chưa thanh toán."
+  "Could not load the complete unpaid list.": "Không tải được toàn bộ danh sách chưa thanh toán.",
+  "Restoring wallet…": "Đang khôi phục ví…",
+  "Restoring History session…": "Đang khôi phục phiên lịch sử…",
+  "Could not restore the viewing session.": "Chưa kiểm tra được phiên xem lịch sử.",
+  "Retry session check": "Kiểm tra lại phiên",
+  "Telegram sent to the payer.": "Đã gửi Telegram cho người trả.",
+  "Sent to payer": "Đã gửi cho người trả",
+  "Disabled": "Đã tắt",
+  "Payer not linked": "Ví người trả chưa liên kết",
+  "Sending — check Telegram": "Đang gửi — kiểm tra Telegram",
+  "Delivery uncertain — check Telegram": "Chưa rõ kết quả — kiểm tra Telegram",
+  "Not sent": "Chưa gửi",
+  "Sending…": "Đang gửi…",
+  "Enable and send Telegram": "Bật và gửi Telegram",
+  "Send Telegram notification": "Gửi thông báo Telegram"
 }

@@ -56,6 +56,7 @@ type List = {
       payerTelegram?: TelegramName;
       amountRtm: string;
       status: string;
+      notification: string;
     }[];
   }[];
   address: string;
@@ -141,10 +142,14 @@ const cellStyle = {
 };
 
 export default function RequestsPage() {
-  const { account } = useSharedWallet();
+  const { account, ready } = useSharedWallet();
   const address = account?.address || "";
   const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [verified, setVerified] = useState(false);
+  const [checkedAddress, setCheckedAddress] = useState("");
+  const [restoreError, setRestoreError] = useState(false);
+  const [restoreAttempt, setRestoreAttempt] = useState(0);
+  const [noticeBusy, setNoticeBusy] = useState("");
   const [expiresAt, setExpiresAt] = useState(0);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -235,26 +240,41 @@ export default function RequestsPage() {
   }, [verified, expiresAt]);
 
   useEffect(() => {
-    if (!address) return;
+    if (!address || !ready) return;
     const controller = new AbortController();
-    fetch("/api/payments?action=session", {
-      cache: "no-store",
-      signal: controller.signal,
-    })
-      .then((r) => r.json())
-      .then((session) => {
-        if (
-          !controller.signal.aborted &&
-          session.address === address &&
-          session.expiresAt > Date.now()
-        ) {
-          setExpiresAt(session.expiresAt);
-          setVerified(true);
-        }
-      })
-      .catch(() => {});
+    async function restore() {
+      try {
+        const response = await fetch("/api/payments?action=session", {
+          cache: "no-store", credentials: "same-origin", signal: controller.signal,
+        });
+        if (!response.ok) throw Error("Session unavailable");
+        const session = await response.json();
+        if (controller.signal.aborted) return;
+        const valid = session.address === address && session.expiresAt > Date.now();
+        setVerified(valid);
+        if (valid) setExpiresAt(session.expiresAt);
+        setRestoreError(false);
+        setCheckedAddress(address);
+      } catch {
+        if (!controller.signal.aborted) setRestoreError(true);
+      }
+    }
+    void restore();
     return () => controller.abort();
-  }, [address]);
+  }, [address, ready, restoreAttempt]);
+  async function sendNotice(member: { id: string; notification: string }) {
+    if (lock.current) return;
+    lock.current = true;
+    setNoticeBusy(member.id);
+    try {
+      const result = await post<{ payment: { notification: string } }>({
+        action: "sendSplitNotification", id: member.id, enable: true,
+      });
+      setNotice(result.payment.notification === "sent" ? "Telegram sent to the payer." : "Telegram delivery not confirmed. Check the payer's Telegram before retrying.");
+      setRefresh((n) => n + 1);
+    } catch (error) { setNotice(errorText(error)); }
+    finally { setNoticeBusy(""); lock.current = false; }
+  }
   async function prepare() {
     if (!address || lock.current) return;
     lock.current = true;
@@ -344,8 +364,11 @@ export default function RequestsPage() {
             }
           </p>
           <div className="hero-actions">
-            {!address && <WalletRequired />}
-            {address && !verified && (
+            {!ready && <UiText text="Restoring wallet…" />}
+            {ready && !address && <WalletRequired />}
+            {address && checkedAddress !== address && !restoreError && <UiText text="Restoring History session…" />}
+            {address && restoreError && <><UiText text="Could not restore the viewing session." /><button className="button secondary" onClick={() => { setRestoreError(false); setRestoreAttempt((n) => n + 1); }}><UiText text="Retry session check" /></button></>}
+            {address && checkedAddress === address && !restoreError && !verified && (
               <>
                 <button
                   className="button secondary"
@@ -473,6 +496,14 @@ export default function RequestsPage() {
                           <Link href={`/payments?id=${member.id}`}>
                             <UiText text="Open payment request" />
                           </Link>
+                          <span style={{ display: "block", marginTop: 8 }}>
+                            <UiText text="Telegram" />: <UiText text={member.notification === "sent" ? "Sent to payer" : member.notification === "disabled" ? "Disabled" : member.notification === "unlinked" ? "Payer not linked" : member.notification === "sending" ? "Sending — check Telegram" : member.notification === "unknown" ? "Delivery uncertain — check Telegram" : "Not sent"} />
+                            {member.status !== "paid" && !["sent", "sending", "unknown"].includes(member.notification) && (
+                              <button type="button" className="button secondary" style={{ marginLeft: 10 }} disabled={!!noticeBusy} onClick={() => void sendNotice(member)}>
+                                <UiText text={noticeBusy === member.id ? "Sending…" : member.notification === "disabled" ? "Enable and send Telegram" : "Send Telegram notification"} />
+                              </button>
+                            )}
+                          </span>
                         </p>
                       ))}
                     </details>

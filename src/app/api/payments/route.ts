@@ -41,7 +41,8 @@ type Payment = {
   confirmedBlock?: string;
   chainTimestamp?: number;
   txId?: string;
-  notification: "pending" | "sent" | "failed" | "unlinked" | "disabled";
+  notification: "pending" | "sending" | "unknown" | "sent" | "failed" | "unlinked" | "disabled";
+  notificationAttemptAt?: number;
   proofHash: string;
   payerLabel?: string;
   payerTelegram?: { displayName: string; username: string };
@@ -562,6 +563,8 @@ export async function POST(request: Request) {
       return await handlePay(request, body, origin);
     }
 
+    if (body.action === "sendSplitNotification")
+      return await sendSplitNotification(request, body);
     if (["saveContact", "removeContact"].includes(String(body.action)))
       return await memberDirectory(request, body);
     if (body.action === "prepareSplit") {
@@ -1283,6 +1286,7 @@ async function deliverPaidNotices(id: string) {
 
 const listChallengeCookie = "retium_requests_challenge";
 const listSessionCookie = "retium_requests_session";
+const viewingSessionSeconds = 24 * 60 * 60;
 const listStatement =
   "View my Retium Pay requests for this wallet. This signature does not authorize payments or transfer funds.";
 function paidDelivery(state: State, id: string) {
@@ -1377,7 +1381,7 @@ async function handleListAuth(
   if (!message || typeof message !== "object" || Array.isArray(message))
     throw new PaymentError("Invalid authentication message.");
   const sessionToken = randomBytes(32).toString("hex");
-  const expiresAt = Date.now() + 3_600_000;
+  const expiresAt = Date.now() + viewingSessionSeconds * 1000;
   await withState(async (state) => {
     const challenge = state.listChallenges![sha256(cookie)];
     if (!challenge || challenge.expiresAt <= Date.now())
@@ -1426,11 +1430,60 @@ async function handleListAuth(
   response.cookies.set(
     listSessionCookie,
     sessionToken,
-    listCookieOptions(origin, 3600),
+    listCookieOptions(origin, viewingSessionSeconds),
   );
   response.cookies.set(listChallengeCookie, "", listCookieOptions(origin, 0));
   return response;
 }
+// Notification-only recovery. A cookie-authenticated bill owner opts in explicitly.
+// Claim before network I/O so concurrent clicks cannot send duplicate requests.
+async function sendSplitNotification(request: Request, body: Record<string, unknown>) {
+  const id = String(body.id || "");
+  if (!/^[0-9a-f]{48}$/.test(id)) throw new PaymentError("Invalid payment request ID.");
+  const links = await readLinks();
+  const claim = await withState(async (state) => {
+    const session = listIdentity(state, request);
+    if (!session) throw new PaymentError("Verify your wallet to view your requests.", 401);
+    const payment = state.payments[id];
+    if (!payment?.splitBillId || payment.recipient !== session.address)
+      throw new PaymentError("Only the bill owner can send this notification.", 403);
+    if (payment.status === "paid") throw new PaymentError("This payment is already complete.");
+    if (payment.notification === "sent") return { payment, chatId: "" };
+    if (payment.notification === "unknown" || payment.notification === "sending")
+      throw new PaymentError("Delivery is uncertain. Check the payer's Telegram before requesting support; no duplicate was sent.", 409);
+    if (payment.notificationAttemptAt && Date.now() - payment.notificationAttemptAt < 60_000)
+      throw new PaymentError("Wait one minute before retrying this notification.", 429);
+    if (payment.notifyTelegram === false && body.enable !== true)
+      throw new PaymentError("Explicitly enable the Telegram notification first.");
+    const link = links[payment.payer];
+    if (!link?.chatId) throw new PaymentError("The payer wallet is not linked to Telegram. Ask the payer to link it first.");
+    if (!process.env.TELEGRAM_BOT_TOKEN?.trim()) throw new PaymentError("Telegram is not configured.", 503);
+    payment.notifyTelegram = true;
+    payment.notification = "sending";
+    payment.notificationAttemptAt = Date.now();
+    return { payment: { ...payment }, chatId: link.chatId };
+  });
+  if (!claim.chatId) return NextResponse.json({ payment: publicPayment(claim.payment) });
+  let outcome: Payment["notification"] = "unknown";
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN!.trim()}/sendMessage`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(telegramPaymentMessage(claim.payment, claim.chatId, false)),
+      signal: AbortSignal.timeout(10_000),
+    });
+    const result = await response.json();
+    // A timeout or unreadable response may follow a successful send: never auto-retry it.
+    outcome = response.ok && result.ok === true ? "sent" : "failed";
+  } catch { /* Persist uncertainty; never expose API credentials or raw errors. */ }
+  const payment = await withState(async (state) => {
+    const saved = state.payments[id];
+    if (saved.notification === "sending" && saved.notificationAttemptAt === claim.payment.notificationAttemptAt)
+      saved.notification = outcome;
+    return publicPayment(saved);
+  });
+  return NextResponse.json({ payment }, { headers: { "Cache-Control": "no-store" } });
+}
+
 async function memberDirectory(
   request: Request,
   body?: Record<string, unknown>,
@@ -1661,6 +1714,7 @@ async function getRequestList(request: Request, query: URLSearchParams) {
           payer: p.payer,
           payerLabel: p.payerLabel || "",
           payerTelegram: p.payerTelegram,
+          notification: p.notification,
           amountRtm: p.amountRtm,
           status: p.status,
         })),
