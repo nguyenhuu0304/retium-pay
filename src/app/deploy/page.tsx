@@ -331,6 +331,7 @@ export default function Deploy() {
             {<UiText text={"Initial supply"} />}
             <UiInput
               inputMode="numeric"
+              placeholder="1000000"
               value={supply}
               disabled={busy || !!saved}
               onChange={(e) => {
@@ -354,6 +355,13 @@ export default function Deploy() {
           </button>
         </section>
         <section className="tool-card" aria-live="polite">
+          {!preview && !saved && <div className="token-preview">
+            <p className="eyebrow"><UiText text="Token preview" /></p>
+            <div className="token-preview-title"><span className="token-avatar">{symbol.trim().slice(0, 1) || "?"}</span><div><h2>{name.trim() || "My Test Token"}</h2><strong>{symbol.trim() || "TOKEN"}</strong></div></div>
+            <dl><div><dt><UiText text="Initial supply" /></dt><dd>{supply || "—"} {symbol}</dd></div><div><dt><UiText text="Decimals" /></dt><dd>18</dd></div><div><dt><UiText text="Owner" /></dt><dd>{wallet ? <CopyValue value={wallet} compact /> : "—"}</dd></div></dl>
+            <p className="form-hint"><UiText text="Preview only. Deployment does not create a liquidity pool." /></p>
+          </div>}
+
           <p role="status">{<UiText text={notice} />}</p>
           {preview && (
             <>

@@ -58,7 +58,7 @@ export default function Home() {
       <header className="dashboard-heading">
         <div>
           <p className="eyebrow">
-            {<UiText text={"COMMUNITY BUILT · RETIUM TESTNET"} />}
+            {<UiText text={"RETIUM PAY · TESTNET"} />}
           </p>
           <h1>{<UiText text={"Your Retium workspace."} />}</h1>
           <p>
@@ -93,9 +93,8 @@ export default function Home() {
         </Link>
       </section>
       <section className="dashboard-tools" aria-label="Available tools">
-        {tools.map((item) => (
+        {[...tools].filter((item) => item.href !== "/telegram").sort((a, b) => ["/payments", "/split", "/requests", "/dex", "/deploy", "/explorer"].indexOf(a.href) - ["/payments", "/split", "/requests", "/dex", "/deploy", "/explorer"].indexOf(b.href)).map((item) => (
           <article className="dashboard-tool" key={item.href}>
-            <span className="dashboard-number">{item.number}</span>
             <h2>{<UiText text={item.title} />}</h2>
             <p>{<UiText text={item.text} />}</p>
             <Link className="button secondary" href={item.href}>

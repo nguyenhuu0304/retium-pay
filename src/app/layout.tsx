@@ -3,6 +3,7 @@ import "./appearance.css";
 import type { Metadata } from "next";
 import "./globals.css";
 import "./tools.css";
+import "./polish.css";
 import { SharedWalletProvider } from "../components/shared-wallet";
 import Ecosystem from "../components/ecosystem";
 

@@ -141,6 +141,7 @@ export default function DexPage() {
     [unknown, setUnknown] = useState(false),
     [confirmed, setConfirmed] = useState(false),
     [clock, setClock] = useState(0);
+  const [backgroundTxs, setBackgroundTxs] = useState<Recovery[]>([]);
   const [marketVersion, setMarketVersion] = useState(0);
   const [picker, setPicker] = useState(false),
     [filter, setFilter] = useState(""),
@@ -199,6 +200,9 @@ export default function DexPage() {
     queueMicrotask(() => {
       if (stopped) return;
       try {
+        const archived = JSON.parse(localStorage.getItem("retium-pay:dex-background:v1") || "[]");
+        if (Array.isArray(archived)) setBackgroundTxs(archived.filter((row) =>
+          /^rete[0-9a-f]{68}$/.test(row.wallet) && /^tx_[0-9a-f]{32}$/.test(row.txId) && typeof row.ticket === "string"));
         const raw = localStorage.getItem(recoveryKey);
         if (raw) {
           const p = JSON.parse(raw);
@@ -551,6 +555,29 @@ export default function DexPage() {
       setBusy(false);
     }
   }
+  function returnToSwap() {
+    // Only detach a TX after the backend has acknowledged its durable registration.
+    if (!pending || !job || busy) return;
+    try {
+      const key = "retium-pay:dex-background:v1";
+      const existing = JSON.parse(localStorage.getItem(key) || "[]");
+      const rows = Array.isArray(existing) ? existing : [];
+      localStorage.setItem(key, JSON.stringify([
+        ...rows.filter((row) => row.txId !== pending.txId),
+        { ...pending, state: job.state },
+      ]));
+      setBackgroundTxs([...rows.filter((row) => row.txId !== pending.txId), pending]);
+      localStorage.removeItem(recoveryKey);
+    } catch {
+      setNotice("Could not save TX recovery. Keep this screen open and try again.");
+      return;
+    }
+    setPending(null);
+    setJob(null);
+    change();
+    setMarketVersion((value) => value + 1);
+    setNotice("Returned to Swap. Your previous TX remains registered for background verification. Telegram delivery does not block new actions. Do not repeat the previous swap while its outcome is unknown.");
+  }
   function finish() {
     if (!job || !["confirmed", "failed"].includes(job.state)) return;
     const continueAfterApproval = job.state === "confirmed" && job.plan.approval;
@@ -721,7 +748,7 @@ export default function DexPage() {
   return (
     <main className={`dex-shell dex-stage-${stage}`}>
       <header>
-        <p className="dex-eyebrow">{<UiText text={"RETIUM TESTNET"} />}</p>
+        <p className="dex-eyebrow">{<UiText text={"RETIUM PAY · TESTNET"} />}</p>
         <h1>{<UiText text={"Swap & liquidity"} />}</h1>
       </header>
       <div className="wallet-strip">
@@ -1325,6 +1352,22 @@ export default function DexPage() {
           </p>
         </section>
       )}
+      {!pending && backgroundTxs.some((row) => row.wallet === wallet) && (
+        <section className="dex-card">
+          <h2><UiText text="Saved transactions" /></h2>
+          {backgroundTxs.filter((row) => row.wallet === wallet).map((row) => (
+            <div key={row.txId}>
+              <CopyValue value={row.txId} />
+              <button disabled={busy} onClick={() => {
+                localStorage.setItem(recoveryKey, JSON.stringify(row));
+                setJob(null);
+                setPending(row);
+                setPreview(null);
+              }}><UiText text="Open TX status" /></button>
+            </div>
+          ))}
+        </section>
+      )}
       {pending && (
         <section className="dex-card transaction-card">
           <h2>
@@ -1366,6 +1409,11 @@ export default function DexPage() {
                 </button>
               )}
             </>
+          )}
+          {job && !["confirmed", "failed"].includes(job.state) && (
+            <button disabled={busy} onClick={returnToSwap}>
+              <UiText text="Back to Swap — keep tracking TX" />
+            </button>
           )}
           <p className="dex-muted">
             {
@@ -1511,7 +1559,7 @@ export default function DexPage() {
         {
           <UiText
             text={
-              "Keep the web server and Background monitor running after “TX saved”. Testnet only."
+              "Saved TXs are verified in the background. You can close this page. Testnet only."
             }
           />
         }

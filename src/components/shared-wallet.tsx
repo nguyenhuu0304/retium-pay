@@ -1,4 +1,5 @@
 "use client";
+import { CopyValue } from "./copy-value";
 import { UiText } from "./preferences";
 import { parseRememberedWallet } from "../lib/ui/remembered-wallet";
 
@@ -176,7 +177,7 @@ export function DashboardWallet() {
         {w.account ? (
           <>
             <p className="shared-wallet-address">
-              <code>{w.account.address}</code>
+              <CopyValue value={w.account.address} compact />
             </p>
             <p className="muted">
               {w.remembered ? (
@@ -208,7 +209,7 @@ export function DashboardWallet() {
       </div>
       <div className="dashboard-wallet-actions">
         <button
-          className="button primary"
+          className={w.account ? "button secondary" : "button primary"}
           disabled={!w.ready || w.busy}
           onClick={() => void w.connect()}
         >
@@ -267,10 +268,15 @@ export function WalletRequired() {
   );
 }
 export function WalletIndicator() {
-  const { account } = useSharedWallet();
-  return account ? (
-    <Link className="global-wallet-indicator" href="/" title={account.address}>
-      {account.address.slice(0, 8)}…{account.address.slice(-6)}
-    </Link>
-  ) : null;
+  const w = useSharedWallet();
+  if (!w.account) return <Link className="wallet-select-link" href="/"><UiText text="Connect Wallet" /></Link>;
+  return <details className="wallet-menu">
+    <summary title={w.account.address}><span className="connection-dot" /><code>{w.account.address.slice(0, 10)}…{w.account.address.slice(-7)}</code></summary>
+    <div>
+      <p className="wallet-menu-label"><UiText text={w.remembered ? "Selected wallet" : "Wallet connected"} /></p>
+      <CopyValue value={w.account.address} compact />
+      <button disabled={!w.ready || w.busy} onClick={() => void w.connect()}><UiText text="Change / confirm wallet" /></button>
+      <button disabled={w.busy} onClick={() => void w.disconnect()}><UiText text="Disconnect" /></button>
+    </div>
+  </details>;
 }

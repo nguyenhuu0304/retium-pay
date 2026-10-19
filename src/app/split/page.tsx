@@ -598,7 +598,7 @@ export default function SplitBill() {
             <label>
               <UiText text="Split mode" />
               <select value={mode} onChange={(e) => setMode(e.target.value)}>
-                <option value="equal">Equal / Chia đều</option>
+                <option value="equal"><UiText text="Equal" /></option>
                 <option value="custom">Custom / Tùy chỉnh</option>
               </select>
             </label>

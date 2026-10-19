@@ -1,3 +1,4 @@
+import { safeWorkerError } from "./safe-worker-error.mjs";
 import { createHash } from "node:crypto";
 import { stableSecret, saveData, closeStorage } from "../src/lib/storage/store.mjs";
 import net from "node:net";
@@ -35,7 +36,8 @@ process.on("SIGTERM", stop);
 
 async function saveStatus() {
   state.lastSeenAt = Date.now();
-  await saveData(statusPath, state);
+  try { await saveData(statusPath, state); }
+  catch (error) { log(`Status persistence unavailable (${safeWorkerError(error)}). Will retry; verifier remains running.`); }
 }
 async function readKey() {
   return stableSecret(keyPath);
@@ -87,7 +89,7 @@ async function main() {
         delay = Math.min(60_000, 15_000 * 2 ** Math.min(failures - 1, 2));
         state.lastError = "Application unreachable or check failed; no payment confirmed.";
         if (error?.fatal) { log(error.message); process.exitCode = 1; break; }
-        log(`Verification unavailable or check failed. Retry in ${delay / 1000}s.`);
+        log(`Verification check failed (${safeWorkerError(error)}). Retry in ${delay / 1000}s.`);
         if (once) process.exitCode = 1;
       }
       await saveStatus();
@@ -101,7 +103,7 @@ async function main() {
 }
 main().catch((error) => {
   process.exitCode = 1;
-  log(error?.code === "EADDRINUSE" ? "Another payments worker for this project is already running, or its local guard port is occupied." : "Could not start the worker. Check the project folder and data permissions.");
+  log(error?.code === "EADDRINUSE" ? "Another payments worker for this project is already running, or its local guard port is occupied." : `Worker startup failed (${safeWorkerError(error)}). Supervisor will retry.`);
 }).finally(() => {
   if (guard.listening) guard.close();
   return closeStorage();

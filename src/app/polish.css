@@ -1,0 +1,76 @@
+/* Shared Retium Pay visual language. Never changes transaction state. */
+:root { --ui-surface:#191c23; --ui-input:#11141a; --ui-text:#f5f6fa; --ui-muted:#b5becb; --ui-line:#363e4b; --ui-accent:#ff641f; }
+:root[data-theme="light"] { --ui-surface:#fff; --ui-input:#f7f8fa; --ui-text:#19212d; --ui-muted:#536074; --ui-line:#d5dce5; --ui-accent:#ff641f; }
+body { font-size:14px; }
+main.app-shell, main.tool-page, main.pay-dashboard { width:100%; max-width:1040px !important; margin:28px auto; padding:0 24px 36px !important; }
+main .wallet-card { margin-top:0 !important; }
+main h1, main h2 { letter-spacing:-.015em !important; line-height:1.2; }
+main h1 { font-size:clamp(27px,3vw,34px) !important; }
+main .eyebrow, main .dex-eyebrow { font-size:12px !important; letter-spacing:.12em !important; color:var(--ui-muted) !important; }
+main .detail-label, main label, main .tag, main .status, main small, main .muted, main .dex-muted, .dashboard-footer, .dashboard-tool p { font-size:13px !important; line-height:1.5; }
+main .detail-label { display:block; margin-top:14px; margin-bottom:7px; color:var(--ui-muted); }
+main .muted, main .dex-muted, main small { color:var(--ui-muted); }
+main input:not([type="checkbox"]):not([type="range"]), main select, main textarea { min-height:44px; border:1px solid var(--ui-line) !important; color:var(--ui-text) !important; background:var(--ui-input) !important; border-radius:10px !important; font-size:14px !important; }
+main input::placeholder, main textarea::placeholder { color:var(--ui-muted); opacity:.8; }
+main input:focus-visible, main select:focus-visible { outline:2px solid var(--ui-accent); outline-offset:2px; }
+main .button.primary:not(:disabled), main.tool-page button:not(.secondary):not(.copy-value):not(:disabled), main .tool-button, main .dex-primary:not(:disabled) { background:var(--ui-accent) !important; border-color:var(--ui-accent) !important; color:#17120f !important; opacity:1; font-weight:700; }
+main .button.secondary, .wallet-menu button, main .history-stat { background:transparent !important; color:var(--ui-text) !important; border:1px solid var(--ui-line) !important; opacity:1; }
+main button:disabled, main .button:disabled { background:#343a45 !important; border-color:#454d5a !important; color:#aab1be !important; opacity:1 !important; cursor:not-allowed; }
+html[data-theme="light"] main button:disabled { background:#e3e7ed !important; color:#6d7785 !important; border-color:#ced5df !important; }
+button.copy-value, main.tool-page button.copy-value { background:transparent !important; border:0 !important; color:inherit !important; display:inline; min-height:0; box-shadow:none; }
+button.copy-value code { white-space:nowrap; font-size:13px; }
+.ecosystem-nav { padding:14px max(20px,calc((100vw - 1160px)/2)) !important; gap:20px; flex-wrap:nowrap; min-height:70px; background:var(--ui-surface); font-size:14px; }
+.ecosystem-nav .app-brand { margin-right:8px; white-space:nowrap; }
+.ecosystem-nav details { margin-left:0 !important; }
+.ecosystem-nav .wallet-menu { margin-left:auto !important; }
+.ecosystem-nav .wallet-select-link { margin-left:auto; }
+.ecosystem-nav summary { display:flex; align-items:center; gap:7px; list-style:none; white-space:nowrap; font-size:13px; }
+.ecosystem-nav summary::-webkit-details-marker { display:none; }
+.ecosystem-nav summary svg { transition:transform .15s; }
+.ecosystem-nav details[open] > summary svg { transform:rotate(180deg); }
+.ecosystem-nav details > div { top:calc(100% + 16px); background:var(--ui-surface); color:var(--ui-text); border-color:var(--ui-line); z-index:60; min-width:220px; }
+.ecosystem-nav details a[aria-current="page"] { color:var(--ui-accent); }
+.wallet-menu > summary { padding:8px 10px; border:1px solid var(--ui-line); border-radius:24px; }
+.connection-dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:#44c888; flex-shrink:0; }
+.wallet-menu button { display:block; padding:9px 12px; border-radius:8px; width:100%; margin-top:12px; text-align:left; cursor:pointer; }
+.wallet-menu-label { margin:4px 0 10px; font-size:12px; color:var(--ui-muted); }
+.more-menu > div { left:0; right:auto; }
+.dashboard-wallet { align-items:center; padding:22px; }
+.dashboard-wallet h2 { font-size:21px; }
+.dashboard-wallet-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.dashboard-wallet .shared-wallet-address { margin:9px 0; }
+.dashboard-start { padding:20px 24px; margin:20px 0; }
+.dashboard-start h2 { font-size:20px; }
+.dashboard-start .tag { display:none; }
+.dashboard-tools { grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+.dashboard-tool { padding:20px; }
+.dashboard-tool h2 { font-size:19px; margin-bottom:10px; }
+.dashboard-tool .button { margin-top:12px; }
+.readiness-row, .history-health { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:18px 0; }
+.readiness { display:inline-flex; align-items:center; gap:7px; padding:5px 10px; border-radius:20px; font-size:12px; border:1px solid transparent; }
+.readiness.good { background:#143e2b; color:#a5edc0; border-color:#286445; }
+.readiness.warning { background:#48351a; color:#ffdc9c; border-color:#775327; }
+.readiness.warning .connection-dot { background:#eeb85c; }
+html[data-theme="light"] .readiness.good { background:#e2f5e8; color:#166335; border-color:#b0dfbf; }
+html[data-theme="light"] .readiness.warning { background:#fff0d6; color:#80520d; border-color:#efcf98; }
+.paste-wallet { float:right; padding:6px 10px; min-height:32px; margin-bottom:8px; }
+.form-hint { background:var(--ui-input); border:1px solid var(--ui-line); border-radius:10px; padding:12px 14px; color:var(--ui-muted); font-size:13px; line-height:1.5; margin:20px 0 14px; }
+.single-action .button { width:100%; min-height:46px; justify-content:center; }
+.step-caption { text-align:center; font-size:13px; color:var(--ui-muted); margin:10px 0 0; }
+.history-stat { padding:15px; text-align:left; border-radius:12px; }
+.history-stat[aria-pressed="true"] { border-color:var(--ui-accent) !important; box-shadow:0 0 0 1px var(--ui-accent); }
+.history-stat .detail-label { margin:0 0 7px; }
+.account-details > summary { display:flex; align-items:center; flex-wrap:wrap; gap:12px; cursor:pointer; }
+.account-details > summary > span:first-child { flex:1; font-weight:600; }
+.token-preview-title { display:flex; gap:14px; align-items:center; margin:24px 0; }
+.token-preview-title h2 { margin:0 0 5px; }
+.token-avatar { display:grid; place-items:center; width:48px; height:48px; background:var(--ui-accent); color:#19120e; font-size:24px; font-weight:700; border-radius:50%; }
+.token-preview dl > div { display:flex; justify-content:space-between; gap:16px; padding:15px 0; border-bottom:1px solid var(--ui-line); }
+.token-preview dt { color:var(--ui-muted); }
+.token-preview dd { margin:0; overflow-wrap:anywhere; text-align:right; }
+.dex-shell .percent-buttons button, .dex-shell .amount-shortcuts button, .dex-shell .amount-presets button { font-size:13px; color:var(--ui-text); border-color:var(--ui-line); opacity:1; }
+@media(max-width:1050px) { .ecosystem-nav { flex-wrap:wrap; gap:14px; } .ecosystem-nav .wallet-menu { margin-left:0 !important; } }
+@media(max-width:650px) { .ecosystem-nav { gap:12px; padding:14px 16px !important; } .ecosystem-nav .app-brand { flex-basis:100%; } .dashboard-tools { grid-template-columns:1fr; } main.app-shell, main.tool-page, main.pay-dashboard { padding-left:16px !important; padding-right:16px !important; } .dashboard-wallet { flex-direction:column; align-items:flex-start; } .token-preview dl > div { flex-wrap:wrap; } }
+@media(prefers-reduced-motion:reduce) { .ecosystem-nav summary svg { transition:none; } }
+main.explorer-page { width:100%; max-width:1040px !important; padding-left:24px; padding-right:24px; }
+html[data-theme="light"] main .amount-presets button:not(:disabled) { color:#243043 !important; background:#f0f3f7; border-color:#c6cfdb; }

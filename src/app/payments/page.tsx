@@ -391,7 +391,7 @@ export default function PaymentsPage() {
         style={{ maxWidth: 900, paddingTop: 40, paddingBottom: 40 }}
       >
         <section className="wallet-card" style={{ marginTop: 25 }}>
-          <p className="eyebrow">{<UiText text={"RETIUM TESTNET"} />}</p>
+          <p className="eyebrow">{<UiText text={"RETIUM PAY · TESTNET"} />}</p>
           <h1 style={{ fontSize: 38 }}>
             {<UiText text={"Payment requests"} />}
           </h1>
@@ -407,9 +407,10 @@ export default function PaymentsPage() {
                   />
                 }
               </p>
-              <Link href="/telegram" className="text-button">
-                {<UiText text={"Link a wallet to Telegram"} />}
-              </Link>
+              <div className="readiness-row">
+                <span className={address ? "readiness good" : "readiness warning"}><span className="connection-dot" /><UiText text={address ? "Selected wallet" : "Wallet required"} /></span>
+                <Link href="/telegram" className={challenge ? "readiness good" : "readiness warning"}><UiText text={challenge ? "Telegram eligibility checked" : "Telegram setup"} /> ↗</Link>
+              </div>
               {address && (
                 <div className="account-details">
                   <span className="detail-label">
@@ -419,10 +420,15 @@ export default function PaymentsPage() {
                 </div>
               )}
               <div style={{ marginTop: 24 }}>
+                <button className="button secondary paste-wallet" disabled={busy} onClick={async () => {
+                  try { setPayer((await navigator.clipboard.readText()).trim()); setChallenge(null); }
+                  catch { setNotice("Paste is unavailable. Paste the wallet address manually."); }
+                }}><UiText text="Paste wallet" /></button>
                 <label htmlFor="payer" className="detail-label">
                   {<UiText text={"Payer wallet address"} />}
                 </label>
                 <UiInput
+                  placeholder="rete…"
                   id="payer"
                   value={payer}
                   disabled={busy}
@@ -437,6 +443,7 @@ export default function PaymentsPage() {
                   {<UiText text={"Amount in RTM"} />}
                 </label>
                 <UiInput
+                  placeholder="0.00"
                   id="amount"
                   value={amount}
                   disabled={busy}
@@ -448,9 +455,10 @@ export default function PaymentsPage() {
                   style={inputStyle}
                 />
                 <label htmlFor="description" className="detail-label">
-                  {<UiText text={"Description"} />}
+                  {<UiText text={"Description (optional)"} />}
                 </label>
                 <UiInput
+                  placeholder="What is this payment for?"
                   id="description"
                   autoComplete="off"
                   value={description}
@@ -463,25 +471,13 @@ export default function PaymentsPage() {
                   style={inputStyle}
                 />
               </div>
-              <div className="hero-actions">
-                <button
-                  className="button secondary"
-                  disabled={busy || !address}
-                  onClick={prepare}
-                >
-                  {<UiText text={"1. Prepare request"} />}
-                </button>
-                <button
-                  className="button primary"
-                  disabled={busy || !challenge}
-                  onClick={create}
-                >
-                  {<UiText text={"2. Sign and create"} />}
+              <p className="form-hint"><span aria-hidden="true">ⓘ</span> <UiText text="Creating a request does not transfer RTM." /></p>
+              <div className="hero-actions single-action">
+                <button className="button primary" disabled={busy || !address} onClick={challenge ? create : prepare}>
+                  <UiText text={busy ? "Please wait…" : challenge ? "Sign and create request" : "Review request"} />
                 </button>
               </div>
-              <p className="muted">
-                {<UiText text={"Creating a request does not transfer RTM."} />}
-              </p>
+              <p className="step-caption"><UiText text={challenge ? "Step 2 of 2 · Sign in Web Wallet" : "Step 1 of 2 · Review before signing"} /></p>
             </>
           ) : (
             <>

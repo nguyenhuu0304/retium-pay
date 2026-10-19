@@ -117,7 +117,7 @@ export default function TelegramPage() {
         style={{ maxWidth: 900, paddingTop: 40, paddingBottom: 40 }}
       >
         <section className="wallet-card" style={{ marginTop: 25 }}>
-          <p className="eyebrow">{<UiText text={"RETIUM TESTNET"} />}</p>
+          <p className="eyebrow">{<UiText text={"RETIUM PAY · TESTNET"} />}</p>
           <h1 style={{ fontSize: 38 }}>{<UiText text={"Link Telegram"} />}</h1>
           {!selectedWallet ? (
             <WalletRequired />

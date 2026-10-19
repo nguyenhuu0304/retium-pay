@@ -165,8 +165,8 @@ export default function RequestsPage() {
         const query = new URLSearchParams({
           action: "list",
           role,
-          status,
-          page: String(page),
+          status: status === "unpaid" ? "all" : status,
+          page: status === "unpaid" ? "1" : String(page),
         });
         const response = await fetch(`/api/payments?${query}`, {
           cache: "no-store",
@@ -183,6 +183,24 @@ export default function RequestsPage() {
             "The verified session belongs to another wallet. Verify the connected wallet again.",
             401,
           );
+        if (status === "unpaid") {
+          // Existing API has no aggregate unpaid filter. Read its complete authorized list,
+          // then filter before paginating so processing/review requests are not omitted.
+          if (!Number.isSafeInteger(data.pages) || data.pages > 200) throw Error("Too many requests for this filter. Select a specific status.");
+          const rows: Item[] = [...data.requests];
+          for (let next = 2; next <= data.pages; next++) {
+            query.set("page", String(next));
+            const response = await fetch(`/api/payments?${query}`, { cache: "no-store", signal: controller.signal });
+            const more = await response.json();
+            if (!response.ok || more.address !== address || !Array.isArray(more.requests)) throw new ApiError("Could not load the complete unpaid list.", response.status);
+            rows.push(...more.requests);
+          }
+          const unique = [...new Map(rows.map((item) => [item.id, item])).values()].filter((item) => item.status !== "paid");
+          data.total = unique.length;
+          data.pages = Math.max(1, Math.ceil(unique.length / 20));
+          data.page = Math.min(page, data.pages);
+          data.requests = unique.slice((data.page - 1) * 20, data.page * 20);
+        }
         if (!controller.signal.aborted) {
           setList(data);
           setExpiresAt(data.expiresAt);
@@ -314,7 +332,7 @@ export default function RequestsPage() {
         style={{ maxWidth: 1200, paddingTop: 40, paddingBottom: 40 }}
       >
         <section className="wallet-card" style={{ marginTop: 25 }}>
-          <p className="eyebrow">{<UiText text={"RETIUM TESTNET"} />}</p>
+          <p className="eyebrow">{<UiText text={"RETIUM PAY · TESTNET"} />}</p>
           <h1 style={{ fontSize: 38 }}>{<UiText text={"My History"} />}</h1>
           <p className="muted">
             {
@@ -351,7 +369,7 @@ export default function RequestsPage() {
                 disabled={busy}
                 onClick={logout}
               >
-                {<UiText text={"Sign out of list"} />}
+                {<UiText text={"Lock private history"} />}
               </button>
             )}
           </div>
@@ -374,17 +392,7 @@ export default function RequestsPage() {
           )}
           {verified && (
             <>
-              {list && (
-                <p className="muted" style={{ marginTop: 20 }}>
-                  {<UiText text={"Background monitor:"} />}{" "}
-                  {list.worker?.online ? (
-                    <UiText text={"running"} />
-                  ) : (
-                    <UiText text={"offline or not started"} />
-                  )}
-                  {<UiText text={". Refresh list to update this indicator."} />}
-                </p>
-              )}
+              {list && <div className="history-health"><span className={list.worker?.online ? "readiness good" : "readiness warning"}><span className="connection-dot" /><UiText text={list.worker?.online ? "Live updates on" : "Live updates unavailable"} /></span><button className="button secondary" disabled={busy || loading} onClick={() => setRefresh((n) => n + 1)}><UiText text="Refresh" /></button></div>}
               {list && (
                 <div
                   style={{
@@ -402,8 +410,15 @@ export default function RequestsPage() {
                     ["Not paid", list.summary.unpaid],
                     ["Needs review", list.summary.review],
                   ].map(([name, count]) => (
-                    <div
-                      className="account-details"
+                    <button
+                      type="button"
+                      aria-pressed={name === "Created by me" ? role === "created" : name === "Addressed to me" ? role === "payable" : name === "Paid" ? status === "paid" : name === "Not paid" ? status === "unpaid" : name === "Needs review" ? status === "review" : role === "all" && status === "all"}
+                      onClick={() => {
+                        setRole(name === "Created by me" ? "created" : name === "Addressed to me" ? "payable" : "all");
+                        setStatus(name === "Paid" ? "paid" : name === "Not paid" ? "unpaid" : name === "Needs review" ? "review" : "all");
+                        setPage(1);
+                      }}
+                      className="account-details history-stat"
                       key={String(name)}
                       style={{ margin: 0 }}
                     >
@@ -411,7 +426,7 @@ export default function RequestsPage() {
                         {<UiText text={name} />}
                       </span>
                       <strong style={{ fontSize: 26 }}>{count}</strong>
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
@@ -427,8 +442,9 @@ export default function RequestsPage() {
                       style={{ marginBottom: 12 }}
                     >
                       <summary>
-                        {bill.description} · {bill.paid}/{bill.count}{" "}
-                        <UiText text="Paid" />
+                        <span>{bill.description.replace(/^\[Bill [^\]]+\]\s*/, "").trim() || "Split Bill"}</span>
+                        <span className={bill.paid === bill.count ? "readiness good" : "readiness warning"}>{bill.paid}/{bill.count} <UiText text="Paid" /></span>
+                        <span>{splitFormat(BigInt(bill.totalAtomic))} RTM</span>
                       </summary>
                       <p>
                         <UiText text="Collected" />:{" "}
@@ -518,6 +534,7 @@ export default function RequestsPage() {
                     <option value="all">
                       {<UiText text={"All statuses"} />}
                     </option>
+                    <option value="unpaid"><UiText text="Not paid" /></option>
                     <option value="requested">
                       {<UiText text={"Requested"} />}
                     </option>
