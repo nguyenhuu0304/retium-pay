@@ -14,6 +14,7 @@ export type Call = {
   amountAtomic: string;
 };
 export type Plan = {
+  lending?: { market: string; marketCodeHash: string; asset: string; assetCodeHash: string };
   deployment?: { codeHash: string; metadata: Record<string, unknown> };
   wallet: string;
   token: string;
@@ -253,3 +254,4 @@ export function makePlan(input: {
     approval,
   };
 }
+

@@ -2,6 +2,7 @@ import { UiText } from "../components/preferences";
 import { DashboardWallet } from "../components/shared-wallet";
 import Link from "next/link";
 const tools = [
+  {title: "Lending", text: "Explore an isolated testnet lending market with RTM collateral.", href: "/lending", label: "Open Lending", number: "08"},
   {
     title: "Split Bill",
     text: "Split a group bill and send each payer a Telegram payment request.",
@@ -93,7 +94,7 @@ export default function Home() {
         </Link>
       </section>
       <section className="dashboard-tools" aria-label="Available tools">
-        {[...tools].filter((item) => item.href !== "/telegram").sort((a, b) => ["/payments", "/split", "/requests", "/dex", "/deploy", "/explorer"].indexOf(a.href) - ["/payments", "/split", "/requests", "/dex", "/deploy", "/explorer"].indexOf(b.href)).map((item) => (
+        {[...tools].filter((item) => item.href !== "/telegram").sort((a, b) => ["/payments", "/split", "/requests", "/dex", "/deploy", "/explorer", "/lending"].indexOf(a.href) - ["/payments", "/split", "/requests", "/dex", "/deploy", "/explorer", "/lending"].indexOf(b.href)).map((item) => (
           <article className="dashboard-tool" key={item.href}>
             <h2>{<UiText text={item.title} />}</h2>
             <p>{<UiText text={item.text} />}</p>
@@ -116,3 +117,4 @@ export default function Home() {
     </main>
   );
 }
+

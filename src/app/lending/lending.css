@@ -1,0 +1,118 @@
+.lending-page {
+  max-width: 1000px;
+  margin: 32px auto;
+  padding: 0 20px 40px;
+  color: var(--foreground);
+}
+.lending-page h1 {
+  font-size: 34px;
+  letter-spacing: -0.02em;
+  margin: 8px 0;
+}
+.lending-page p {
+  line-height: 1.6;
+}
+.lending-page .eyebrow {
+  color: var(--orange);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+}
+.lending-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 20px;
+}
+.lending-card {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 22px;
+  background: var(--background);
+}
+.lending-page .warning {
+  border-left: 3px solid var(--orange);
+  padding: 12px 16px;
+  background: color-mix(in srgb, var(--orange) 8%, transparent);
+  font-size: 13px;
+  margin: 18px 0;
+}
+.lending-page label {
+  display: block;
+  font-size: 13px;
+  margin: 18px 0 6px;
+}
+.lending-page input,
+.lending-page select {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--background);
+  color: inherit;
+  padding: 12px;
+  font-size: 15px;
+}
+.lending-page button {
+  padding: 10px 15px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  margin: 6px 6px 0 0;
+}
+.lending-page button.primary {
+  background: #f66b27;
+  color: #17110b;
+  border: 0;
+  font-weight: 700;
+}
+.lending-page button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.lending-page dl {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  font-size: 14px;
+}
+.lending-page dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.lending-page dt {
+  color: var(--muted);
+}
+.lending-page .muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+.lending-page code {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.lending-page .status {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+}
+.lending-page .preview {
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+  margin-top: 18px;
+}
+.lending-page .preview p {
+  margin: 4px 0;
+  font-size: 13px;
+}
+@media (max-width: 720px) {
+  .lending-grid {
+    grid-template-columns: 1fr;
+  }
+  .lending-page {
+    margin-top: 18px;
+  }
+}

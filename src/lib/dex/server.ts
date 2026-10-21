@@ -148,6 +148,10 @@ export async function market(token: string, wallet: string) {
 async function key() {
   return stableSecret(path.join(directory, "dex-intents.key"));
 }
+export async function issueTrackingTicket(plan: Plan) {
+  const payload = Buffer.from(JSON.stringify(plan)).toString("base64url");
+  return `${payload}.${createHmac("sha256", await key()).update(payload).digest("hex")}`;
+}
 export async function prepare(body: Record<string, unknown>) {
   const token = String(body.token || ""),
     wallet = String(body.wallet || "");
@@ -527,6 +531,14 @@ export async function dexTick(target?: { txId: string; wallet: string }) {
             "Deployed contract code does not match the approved template.";
         }
       }
+      if (state === "confirmed" && snapshot.plan.lending) {
+        const expected = snapshot.plan.lending;
+        const [market, asset] = await Promise.all([rpcRead(`contract/${expected.market}`), rpcRead(`contract/${expected.asset}`)]);
+        if (market.code_hash !== expected.marketCodeHash || asset.code_hash !== expected.assetCodeHash) {
+          state = "review";
+          error = "Lending market or asset code differs from the configured testnet market.";
+        }
+      }
       await store((s) => {
         const j = s.jobs[snapshot.txId];
         if (j.state !== "pending") return;
@@ -581,6 +593,12 @@ export async function dexTick(target?: { txId: string; wallet: string }) {
     if (!chatId) notice = "unlinked";
     else {
       const labels: Record<string, string> = {
+        supply: "Lending supply",
+        withdraw: "Lending withdrawal",
+        deposit_collateral: "Deposit RTM collateral",
+        withdraw_collateral: "Withdraw RTM collateral",
+        borrow: "Borrow",
+        repay: "Repay loan",
         swap: "Swap",
         add_liquidity: "Add liquidity",
         create_pool: "Create pool",
@@ -608,7 +626,9 @@ export async function dexTick(target?: { txId: string; wallet: string }) {
       if (ready.error) lines.push(escapeHtml(ready.error));
       lines.push(
         "",
-        ready.plan.deployment
+        ready.plan.lending
+          ? "Testnet lending. Contract execution and configured code hashes verified. Refresh your position for accrued balances; an approval alone does not complete a loan operation."
+          : ready.plan.deployment
           ? "Testnet only. Deployment and template code verified. No liquidity pool has been created."
           : "Testnet only. The token is from the preview; exact swap outputs and LP changes require a receipt.",
       );
@@ -710,3 +730,4 @@ export async function queueSummary() {
     dexPendingNotices: Object.values(s.jobs).filter(j => j.state !== "pending" && j.notice === "pending").length,
   }));
 }
+

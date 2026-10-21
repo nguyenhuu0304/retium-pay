@@ -16,7 +16,7 @@ const websites = [
 export default function Ecosystem() {
   const pathname = usePathname();
   const links = [["/payments", "Payments"], ["/split", "Split Bill"], ["/requests", "My History"], ["/dex", "DEX"]];
-  const more = [["/telegram", "Telegram"], ["/deploy", "Deploy token"], ["/explorer", "Explorer"]];
+  const more = [["/lending", "Lending"], ["/telegram", "Telegram"], ["/deploy", "Deploy token"], ["/explorer", "Explorer"]];
   useEffect(() => {
     // Close native dropdowns on route changes, including Back/Forward navigation.
     document.querySelectorAll<HTMLDetailsElement>(".ecosystem-nav details[open]").forEach((node) => node.open = false);
@@ -54,3 +54,4 @@ export default function Ecosystem() {
     </nav>
   );
 }
+
