@@ -78,7 +78,7 @@ export function lendingPlan(
         ? "Approval only. Return and review the lending action separately."
         : action,
       `Debt asset: ${c.symbol}`,
-      `Manual administrator test price; not a decentralized oracle.`,
+      `Testnet reference feed; confirm the market price source and freshness. Not a decentralized oracle.`,
       ...(action === "withdraw" || action === "repay"
         ? [`Position shares: ${amount}`]
         : [

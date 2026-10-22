@@ -1,0 +1,6 @@
+.env*
+*.env
+*.sk
+*.key
+*state.json*
+node_modules/

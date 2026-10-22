@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import {
+  identity,
+  trackingPlan,
+  register,
+  job,
   prepareDeploy,
   stakeSummary,
   pools,
@@ -56,6 +60,20 @@ export async function POST(request: Request) {
     const body = JSON.parse(text);
     if (!body || typeof body !== "object" || Array.isArray(body))
       throw Error("Invalid request.");
+    if (body.operation === "register" || body.operation === "status") {
+      const ticket = String(body.ticket || "");
+      const plan = await trackingPlan(ticket);
+      const address = await identity(request);
+      if(address !== plan.wallet) throw Error("Wallet session does not own this preview.");
+      const txId = String(body.txId || "");
+      if(!/^tx_[a-f0-9]{32}$/.test(txId)) throw Error("Invalid transaction ID.");
+      const result = body.operation === "register"
+        ? await register(ticket, txId, plan.wallet)
+        : await job(txId, plan.wallet);
+      // A ticket is a capability only for its exact immutable plan, never another wallet's job.
+      if (JSON.stringify(result.plan) !== JSON.stringify(plan)) throw Error("Ticket does not authorize this transaction.");
+      return NextResponse.json({job: result}, {headers: {"Cache-Control":"no-store"}});
+    }
     if (body.operation === "prepareDeploy")
       return NextResponse.json(await prepareDeploy(body), {
         headers: { "Cache-Control": "no-store" },
@@ -75,3 +93,4 @@ export async function POST(request: Request) {
 }
 
 export const maxDuration = 60;
+

@@ -1,3 +1,5 @@
+import { verifyDexTx } from "../transactions/verify";
+export { verifyDexTx } from "../transactions/verify";
 import { readPool } from "./pool-read";
 import { parseReviewSnapshot, parseDeploymentAccount } from "./review-input";
 import { blake3 } from "@noble/hashes/blake3.js";
@@ -13,7 +15,6 @@ import {
   UNIT,
   atomic,
   decimalAtomic,
-  fmt,
   DEX,
   makePlan,
   type Plan,
@@ -316,7 +317,7 @@ export async function identity(request: Request) {
       .find((x) => x.startsWith("retium_requests_session="))
       ?.slice("retium_requests_session=".length) || "";
   if (!/^[0-9a-f]{64}$/.test(token))
-    throw Error("Sign in with your wallet for Telegram tracking.");
+    throw Error("Sign in with your wallet to view private History.");
   const state = JSON.parse(
     await readFile(path.join(directory, "payments.json"), "utf8"),
   );
@@ -332,7 +333,7 @@ export type DexJob = {
   plan: Plan;
   registeredAt: number;
   state: "pending" | "confirmed" | "failed" | "review";
-  notice: "pending" | "sending" | "sent" | "failed" | "unknown" | "unlinked";
+  notice: "disabled" | "pending" | "sending" | "sent" | "failed" | "unknown" | "unlinked";
   nextCheck: number;
   failures: number;
   error?: string;
@@ -347,9 +348,8 @@ async function store<T>(fn: (s: Store) => T | Promise<T>): Promise<T> {
     return fn(state);
   });
 }
-export async function register(ticket: string, txId: string, wallet: string) {
-  if (!/^tx_[0-9a-f]{32}$/.test(txId) || ticket.length > 10000)
-    throw Error("Invalid transaction registration.");
+export async function trackingPlan(ticket: string) {
+  if(typeof ticket !== "string" || ticket.length > 10000) throw Error("Invalid preview ticket.");
   const [payload, sig, ...extra] = ticket.split("."),
     expected = createHmac("sha256", await key())
       .update(payload || "")
@@ -363,8 +363,14 @@ export async function register(ticket: string, txId: string, wallet: string) {
   const plan = JSON.parse(
     Buffer.from(payload, "base64url").toString("utf8"),
   ) as Plan;
-  if (plan.wallet !== wallet)
-    throw Error("Preview does not belong to this wallet.");
+  if(!/^rete[0-9a-f]{68}$/.test(plan.wallet) || !Number.isSafeInteger(plan.nonce) || !plan.call || !/^[a-f0-9]{64}$/.test(plan.call.contractId)) throw Error("Invalid preview plan.");
+  return plan;
+}
+export async function register(ticket: string, txId: string, wallet: string) {
+  if (!/^tx_[0-9a-f]{32}$/.test(txId) || ticket.length > 10000)
+    throw Error("Invalid transaction registration.");
+  const plan = await trackingPlan(ticket);
+  if(plan.wallet !== wallet) throw Error("Preview does not belong to this wallet.");
   return store((s) => {
     if (s.jobs[txId]) {
       if (s.jobs[txId].wallet !== wallet)
@@ -391,7 +397,7 @@ export async function register(ticket: string, txId: string, wallet: string) {
       plan,
       registeredAt: Date.now(),
       state: "pending",
-      notice: "pending",
+      notice: "disabled",
       nextCheck: 0,
       failures: 0,
     };
@@ -407,98 +413,12 @@ export async function job(txId: string, wallet: string) {
     return j;
   });
 }
-export function verifyDexTx(tx: Record<string, unknown>, j: DexJob) {
-  const finality = tx.finality || tx.status;
-  if (["Rejected", "Voided", "Failed"].includes(String(finality)))
-    return "failed";
-  if (finality !== "HardFinal") return "pending";
-  if (j.plan.deployment) {
-    if (
-      tx.tx_id !== j.txId ||
-      tx.sender !== j.wallet ||
-      tx.action !== "deploy" ||
-      tx.recipient !== j.plan.call.contractId ||
-      tx.nonce !== j.plan.nonce ||
-      tx.amount !== "0"
-    )
-      throw Error("Deployment does not match the preview. Check the Explorer.");
-    if (
-      typeof tx.timestamp !== "number" ||
-      !Number.isSafeInteger(tx.timestamp) ||
-      tx.timestamp * 1000 < j.plan.createdAt - 30_000 ||
-      tx.timestamp * 1000 > Date.now() + 60_000
-    )
-      throw Error("Unexpected deployment timestamp.");
-    if (
-      tx.exec_error ||
-      tx.rejection_reason ||
-      (tx.exec_status && tx.exec_status !== "ok")
-    )
-      return "failed";
-    if (tx.exec_status !== "ok")
-      throw Error(
-        "Deployment execution status is not available yet. Check the Explorer.",
-      );
-    return "confirmed";
-  }
-  if (
-    tx.tx_id !== j.txId ||
-    tx.sender !== j.wallet ||
-    tx.action !== "call" ||
-    tx.recipient !== j.plan.call.contractId ||
-    tx.nonce !== j.plan.nonce
-  )
-    throw Error(
-      "Transaction does not match the prepared contract call. Review in the Explorer.",
-    );
-  const call = tx.call as {
-    contract?: string;
-    method?: string;
-    args?: unknown;
-  } | null;
-  if (
-    call?.contract !== j.plan.call.contractId ||
-    call?.method !== j.plan.call.method ||
-    tx.amount !== j.plan.call.amountAtomic
-  )
-    throw Error("Contract, method or attached RTM does not match the preview.");
-  if (call?.args !== undefined) {
-    const args = Array.isArray(call.args)
-      ? call.args.map(String).join(",")
-      : call.args;
-    if (args !== j.plan.call.args.join(","))
-      throw Error("Contract arguments do not match the preview.");
-  }
-  const timestamp = tx.timestamp;
-  if (
-    typeof timestamp !== "number" ||
-    !Number.isSafeInteger(timestamp) ||
-    timestamp * 1000 < j.plan.createdAt - 30_000 ||
-    timestamp * 1000 > Date.now() + 60_000
-  )
-    throw Error("Unexpected transaction timestamp.");
-  if (tx.exec_error || tx.rejection_reason) return "failed";
-  if (tx.exec_status !== "ok" || (tx.status && tx.status !== "HardFinal"))
-    return "failed";
-  return "confirmed";
-}
-const escapeHtml = (s: string) =>
-  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 export async function dexTick(target?: { txId: string; wallet: string }) {
   const matches = (j: DexJob) =>
     !target || (j.txId === target.txId && j.wallet === target.wallet);
   const snapshot = await store((s) => {
-    for (const j of Object.values(s.jobs)) {
-      if (j.notice === "sending" && (j.claimedAt || 0) < Date.now() - 60_000)
-        j.notice = "unknown";
-    }
-    if (
-      process.env.TELEGRAM_BOT_TOKEN &&
-      Object.values(s.jobs).some(
-        (j) => matches(j) && j.state !== "pending" && j.notice === "pending",
-      )
-    )
-      return null;
+    // Existing queued notifications are disabled as well; chain status is retained.
+    for (const j of Object.values(s.jobs)) j.notice = "disabled";
     const j = Object.values(s.jobs)
       .filter(
         (j) => matches(j) && j.state === "pending" && j.nextCheck <= Date.now(),
@@ -573,89 +493,7 @@ export async function dexTick(target?: { txId: string; wallet: string }) {
     }
     return true; // Notification is sent on a later tick, keeping worker calls short.
   }
-  if (!process.env.TELEGRAM_BOT_TOKEN) return false;
-  const ready = await store((s) => {
-    const j = Object.values(s.jobs).find(
-      (j) => matches(j) && j.state !== "pending" && j.notice === "pending",
-    );
-    if (!j) return null;
-    j.notice = "sending";
-    j.claimedAt = Date.now();
-    return structuredClone(j);
-  });
-  if (!ready) return false;
-  let notice: DexJob["notice"] = "unknown";
-  try {
-    const links = JSON.parse(
-      await readFile(path.join(directory, "telegram-links.json"), "utf8"),
-    ).links;
-    const chatId = links?.[ready.wallet]?.chatId;
-    if (!chatId) notice = "unlinked";
-    else {
-      const labels: Record<string, string> = {
-        supply: "Lending supply",
-        withdraw: "Lending withdrawal",
-        deposit_collateral: "Deposit RTM collateral",
-        withdraw_collateral: "Withdraw RTM collateral",
-        borrow: "Borrow",
-        repay: "Repay loan",
-        swap: "Swap",
-        add_liquidity: "Add liquidity",
-        create_pool: "Create pool",
-        remove_liquidity: "Remove liquidity",
-        lock_liquidity: "Lock liquidity",
-        approve: "Token approval",
-        deploy: "Deploy token",
-      };
-      const lines = [
-        `<b>Retium Pay · ${ready.state === "confirmed" ? (ready.plan.deployment ? "Token deployed" : "Contract call confirmed") : "Transaction needs attention"}</b>`,
-        "",
-        `<b>Action:</b> ${labels[ready.plan.call.method] || "Contract call"}`,
-        `<b>Token (preview):</b> ${escapeHtml(ready.plan.symbol)}`,
-        `<b>Wallet:</b> <code>${ready.wallet}</code>`,
-        `<b>Contract:</b> <code>${ready.plan.call.contractId}</code>`,
-        `<b>Attached RTM:</b> ${ready.plan.call.amountAtomic === "0" ? "0" : fmt(BigInt(ready.plan.call.amountAtomic))}`,
-        `<b>Status:</b> ${ready.state === "confirmed" ? "HardFinal · execution ok" : escapeHtml(ready.state)}`,
-        `<b>TX:</b> <code>${ready.txId}</code>`,
-      ];
-      if (ready.block) lines.push(`<b>Block:</b> <code>${ready.block}</code>`);
-      if (ready.timestamp)
-        lines.push(
-          `<b>Time (Australia/Sydney):</b> ${new Intl.DateTimeFormat("en-AU", { timeZone: "Australia/Sydney", dateStyle: "short", timeStyle: "long" }).format(ready.timestamp * 1000)}`,
-        );
-      if (ready.error) lines.push(escapeHtml(ready.error));
-      lines.push(
-        "",
-        ready.plan.lending
-          ? "Testnet lending. Contract execution and configured code hashes verified. Refresh your position for accrued balances; an approval alone does not complete a loan operation."
-          : ready.plan.deployment
-          ? "Testnet only. Deployment and template code verified. No liquidity pool has been created."
-          : "Testnet only. The token is from the preview; exact swap outputs and LP changes require a receipt.",
-      );
-      const response = await fetch(
-        `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            chat_id: chatId,
-            parse_mode: "HTML",
-            text: lines.join("\n"),
-            link_preview_options: { is_disabled: true },
-          }),
-          signal: AbortSignal.timeout(10_000),
-        },
-      );
-      const data = await response.json();
-      notice = response.ok && data.ok === true ? "sent" : "failed";
-    }
-  } catch {
-    /* An acknowledgement can be lost after a successful send; never duplicate automatically. */
-  }
-  await store((s) => {
-    s.jobs[ready.txId].notice = notice;
-  });
-  return true;
+  return false;
 }
 
 // Token names are loaded only when the user opens or pages through the picker.

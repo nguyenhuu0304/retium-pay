@@ -1,4 +1,6 @@
 "use client";
+import { publicStatus, decodePlan } from "../../lib/transactions/public-status";
+import { saveReceipt, syncHistory } from "../../lib/transactions/history";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSharedWallet } from "../../components/shared-wallet";
@@ -10,6 +12,7 @@ import {
   actions,
   type LendingAction,
 } from "../../lib/lending/plan";
+import { repayLimits, collateralAvailable, borrowAvailable } from "../../lib/lending/amounts";
 import { units, fmt, type Plan } from "../../lib/dex/math";
 import "./lending.css";
 type Preview = { plan: Plan; ticket: string; displayAmount?: string };
@@ -23,24 +26,11 @@ type Pending = {
 // Compare allowance with the repayment plus a small signing-time margin.
 // A new approval grants a larger 0.1% buffer. Never require that entire
 // buffer again after every accrual, or approvals repeat indefinitely.
-function repayLimits(debt: bigint) {
-  return { required: debt + debt / 1000000n + 2n,
-    approval: debt + debt / 1000n + 2n };
-}
 function shortAmount(value: string) {
   const [whole, fraction = ""] = value.split(".");
   if (!fraction) return whole;
   const trimmed = fraction.slice(0, 6).replace(/0+$/, "");
   return whole === "0" && !trimmed && /[1-9]/.test(fraction) ? "<0.000001" : whole + (trimmed ? "." + trimmed : "");
-}
-function collateralAvailable(p: Record<string,string>, m: Record<string,string>) {
-  const collateral = BigInt(p.collateral), debt = BigInt(p.debt), price = BigInt(m.price);
-  if (debt === 0n) return collateral;
-  if (m.price_fresh !== "true" || price <= 0n) return 0n;
-  // Keep a 0.1% debt margin for interest during signing; chain validation remains authoritative.
-  const buffered = debt + debt / 1000n + 2n;
-  const required = (buffered * 2n * 10n ** 18n + price - 1n) / price;
-  return collateral > required ? collateral - required : 0n;
 }
 const recoveryPrefix = "retium-pay:lending:pending:v1:";
 const error = (e: unknown) => {
@@ -77,8 +67,6 @@ export default function Lending() {
     [notice, setNotice] = useState(""),
     [adminBlocked, setAdminBlocked] = useState(false),
     [lastTx, setLastTx] = useState(""),
-    [tracking, setTracking] = useState<Pending[]>([]),
-    [trackingNotice, setTrackingNotice] = useState(""),
     [group, setGroup] = useState<"save" | "borrow">("save"),
     [busy, setBusy] = useState(false),
     [recoveryTx, setRecoveryTx] = useState("");
@@ -124,11 +112,6 @@ export default function Lending() {
         setData(null);
         setLastTx("");
         setPreview(null);
-        const savedTracking = JSON.parse(localStorage.getItem(recovery + ":tracking") || "null");
-        const queue = (Array.isArray(savedTracking) ? savedTracking : savedTracking ? [savedTracking] : [])
-          .filter((entry: Pending) => entry.wallet === wallet && /^tx_[0-9a-f]{32}$/.test(entry.txId) && typeof entry.ticket === "string");
-        setTracking(queue);
-        setTrackingNotice(queue.length ? "Telegram: tracking registration needs attention. Your transaction is checked separately." : "");
         const p = JSON.parse(localStorage.getItem(recovery) || "null");
         setPending(
           p &&
@@ -229,9 +212,9 @@ export default function Lending() {
       }
       if (
         action === "borrow" &&
-        (n > BigInt(m.cash) || n + BigInt(p.debt) > BigInt(p.borrow_limit))
+        n > borrowAvailable(p,m)
       )
-        throw Error("Amount exceeds available liquidity or your borrow limit.");
+        throw Error("Amount exceeds available liquidity or the safe borrow limit. Use Max to include the signing-time reserve.");
       if (action === "withdraw_collateral") {
         if (useMax) { n = collateralAvailable(p, m); setAmount(fmt(n)); }
         if (n <= 0n) throw Error("No collateral can be withdrawn now. Repay debt or wait for a fresh test price.");
@@ -300,16 +283,13 @@ export default function Lending() {
       const fresh = await snapshot(config, wallet);
       if (activeWallet.current !== wallet) throw Error("Wallet changed. Start again with the selected wallet.");
       setData(fresh);
-      const min = (a: bigint, b: bigint) => a < b ? a : b;
       let total = 0n;
       if (action === "supply") total = BigInt(fresh.balance);
       if (action === "withdraw") total = BigInt(fresh.position.supplied);
       if (action === "repay") total = BigInt(fresh.position.debt);
       if (action === "borrow") {
-        if (fresh.market.price_fresh !== "true") throw Error("Test price expired. Ask the administrator to refresh the simulated price. Repayment remains available.");
-        const remaining = BigInt(fresh.position.borrow_limit) - BigInt(fresh.position.debt);
-        total = fresh.market.price_fresh === "true" && fresh.market.paused === "0"
-          ? min(BigInt(fresh.market.cash), remaining > 0n ? remaining : 0n) : 0n;
+        if (fresh.market.price_fresh !== "true") throw Error("Price feed expired. Borrowing is paused until a fresh update. Repayment remains available.");
+        total = borrowAvailable(fresh.position,fresh.market);
       }
       if (action === "withdraw_collateral") total = collateralAvailable(fresh.position, fresh.market);
       if (action === "deposit_collateral") {
@@ -326,39 +306,10 @@ export default function Lending() {
       setNotice(action === "deposit_collateral"
         ? "Percentage uses your RTM balance minus a 1 RTM gas reserve."
         : action === "borrow"
-          ? "Percentage uses available liquidity and your remaining borrow limit. Max reaches the borrowing limit."
+          ? "Percentage uses available liquidity and a small interest and rounding reserve."
           : "Percentage calculated from your refreshed balance or position.");
     } catch (e) { setNotice(error(e)); }
     finally { lock.current = false; setBusy(false); }
-  }
-  async function register(p: Pending) {
-    return post("/api/payments", {
-      operation: "dexRegister",
-      ticket: p.ticket,
-      txId: p.txId,
-    });
-  }
-  function saveTracking(entry: Pending, remove = false) {
-    const raw = JSON.parse(localStorage.getItem(recovery + ":tracking") || "[]");
-    const queue: Pending[] = (Array.isArray(raw) ? raw : raw ? [raw] : [])
-      .filter((p: Pending) => p.wallet === wallet && p.txId !== entry.txId);
-    if (!remove) queue.push(entry);
-    localStorage.setItem(recovery + ":tracking", JSON.stringify(queue));
-    setTracking(queue);
-  }
-  async function retryTracking() {
-    if (!tracking.length || busy || lock.current) return;
-    lock.current = true;
-    setBusy(true);
-    try {
-      for (const entry of tracking) {
-        await register(entry);
-        saveTracking(entry, true);
-      }
-      setTrackingNotice("Telegram: tracking registered. Independent server verification is still required before notification.");
-    } catch (e) {
-      setTrackingNotice(`Telegram: ${error(e)} Open My History to authorize tracking, then retry. No funds are sent by retrying.`);
-    } finally { lock.current = false; setBusy(false); }
   }
   async function execute() {
     if (!preview || pending || lock.current || !config || adminBlocked) return;
@@ -400,18 +351,9 @@ export default function Lending() {
       hold = { ...hold, txId: result.txId!, unknown: false };
       localStorage.setItem(recovery, JSON.stringify(hold));
       setPending(hold);
-      saveTracking(hold);
-      try {
-        await register(hold);
-        saveTracking(hold, true);
-        setTrackingNotice("Telegram: tracking registered; awaiting independent server verification.");
-        setNotice(
-          "Transaction submitted. Checking execution automatically…",
-        );
-      } catch (e) {
-        setNotice("Transaction submitted. Checking execution automatically…");
-        setTrackingNotice(`Telegram tracking is not registered: ${error(e)}. This does not mean the transaction failed.`);
-      }
+      saveReceipt({txId:hold.txId,wallet,plan:decodePlan(hold.ticket),state:"pending"});
+      void syncHistory(hold.ticket,hold.txId,wallet);
+      setNotice("Transaction submitted. Checking execution automatically…");
     } catch (e) {
       const code = String((e as { code?: unknown })?.code || "");
       if (
@@ -444,26 +386,12 @@ export default function Lending() {
         localStorage.setItem(recovery, JSON.stringify(p));
         setPending(p);
       }
-      const tx = await readPublic(`transaction/${p.txId}`);
-      if (activeWallet.current !== wallet) return;
-      if (tx.tx_id !== p.txId || tx.sender !== p.wallet)
-        throw Error("TX does not match this wallet.");
-      const expected = JSON.parse(
-        atob(p.ticket.split(".")[0].replace(/-/g, "+").replace(/_/g, "/")),
-      ) as Plan;
-      if (
-        tx.recipient !== expected.call.contractId ||
-        tx.call?.method !== expected.call.method ||
-        tx.amount !== expected.call.amountAtomic ||
-        tx.nonce !== expected.nonce
-      )
-        throw Error("TX does not match this preview. Review wallet history.");
-      if (
-        (tx.finality || tx.status) === "HardFinal" &&
-        tx.exec_status === "ok" &&
-        !tx.exec_error &&
-        !tx.rejection_reason
-      ) {
+      const observed=await publicStatus(p.ticket,p.txId,p.wallet);
+      if(activeWallet.current !== wallet) return;
+      const expected=observed.plan;
+      saveReceipt({...observed});
+      void syncHistory(p.ticket,p.txId,p.wallet);
+      if(observed.state === "confirmed") {
         localStorage.removeItem(recovery);
         setPending(null);
         setLastTx(p.txId);
@@ -472,21 +400,12 @@ export default function Lending() {
           : "Transaction successful · HardFinal · execution OK.");
         try { setData(await snapshot(config, wallet)); }
         catch { setNotice("Transaction successful · HardFinal. Position refresh unavailable; use Refresh position. Do not resend."); }
-      } else if (
-        ["Rejected", "Failed", "Voided"].includes(tx.finality || tx.status) ||
-        tx.exec_error ||
-        tx.rejection_reason ||
-        ((tx.finality || tx.status) === "HardFinal" &&
-          typeof tx.exec_status === "string" &&
-          tx.exec_status !== "ok")
-      ) {
+      } else if (observed.state === "failed") {
         localStorage.removeItem(recovery);
         setPending(null);
         setNotice("Transaction failed. You can review a new action.");
       } else
-        setNotice(
-          "Still awaiting final execution. You can leave this page and check later.",
-        );
+        setNotice(observed.state === "review" ? observed.error : "Still awaiting final execution. You can leave this page and check later.");
     } catch (e) {
       setNotice(error(e));
     } finally {
@@ -509,7 +428,7 @@ export default function Lending() {
         <UiText text="Supply a debt asset. Use RTM as collateral. Keep control of every signature." />
       </p>
       <div className="warning">
-        <UiText text="Experimental testnet market. Prices are entered by the administrator, not a decentralized oracle. Use test assets only." />
+        {data?.market.oracle_mode === "safehouse_reference_feed" ? <UiText text="Testnet · Safehouse reference: 1 RTM = 1 RTD. Refreshed by a dedicated publisher checking the official API. Centralized feed; not a market-price oracle." /> : <UiText text="Experimental testnet market. Prices are entered by the administrator, not a decentralized oracle. Use test assets only." />}
       </div>
       {!config ? (
         <p>
@@ -545,7 +464,7 @@ export default function Lending() {
               <button disabled={busy || !!pending || adminBlocked} aria-pressed={group === "borrow"} className={group === "borrow" ? "primary" : ""}
                 onClick={() => { setGroup("borrow"); change("deposit_collateral"); }}>Borrow / Repay</button>
             </div>
-            {group === "borrow" && data && data.market.price_fresh !== "true" && <div className="warning" role="status">Test price expired. Borrowing needs a fresh administrator price. Repayment remains available.</div>}
+            {group === "borrow" && data && data.market.price_fresh !== "true" && <div className="warning" role="status">Price feed expired. Borrowing is paused until a fresh update. Repayment remains available.</div>}
             <p className="muted">{group === "save" ? "Supply RTD to the pool, or withdraw your supplied balance when liquidity is available." : "1. Deposit RTM collateral → 2. Borrow RTD → 3. Repay → 4. Withdraw collateral."}</p>
             {!preview && !pending && <>
             <label htmlFor="lending-action">
@@ -651,10 +570,6 @@ export default function Lending() {
                 </Link>
               </div>
             )}
-            {trackingNotice && <div className="preview">
-              <strong>Telegram notifications</strong><p>{trackingNotice}</p>
-              {tracking.length > 0 && <><p>{tracking.length} transaction(s) awaiting tracking registration.</p><button onClick={retryTracking} disabled={busy}>Retry notification tracking</button><Link href="/requests">Authorize My History</Link></>}
-            </div>}
           </section>
           <aside className="lending-card">
             <h2>
@@ -736,7 +651,7 @@ export default function Lending() {
         </div>
       )}
 
-      {config?.enabled && wallet === PRICE_OWNER && <PriceAdmin key={wallet + config.market} config={config} wallet={wallet} chain={Number(account?.chainId)} disabled={busy || !!pending || !!preview}
+      {config?.enabled && data?.market.oracle_mode === "admin_test_feed" && wallet === PRICE_OWNER && <PriceAdmin key={wallet + config.market} config={config} wallet={wallet} chain={Number(account?.chainId)} disabled={busy || !!pending || !!preview}
         onBlocked={setAdminBlocked} onFresh={setData} />}
       <p className="muted">
         <UiText text="Testnet prototype; not audited. Payments and DEX use their existing independent contracts." />

@@ -1,0 +1,9 @@
+RETIUM_ORACLE_MODE=probe
+RETIUM_ORACLE_MARKET=82f342939b74a4b3d7d25f91efc7c6513657ec65a2ad26fea7c80eefeddb16b1
+RETIUM_ORACLE_CODE_HASH=0eb5be7eed26b9a5105a007f2f9e81352e451bad6f79a45f320c725b65c0dbe0
+RETIUM_ORACLE_ADDRESS=rete5562395fa3d8f4713742d55de025e43ed6e34628ef3657e39033b069808527229e82
+# Only after a /data volume is mounted and service replicas = 1:
+RETIUM_ORACLE_PERSISTENCE_ACK=volume-mounted-single-replica
+# Private service Variables only, never Git:
+# RETIUM_API_KEY=your developer API key
+# RETIUM_ORACLE_KEY_BASE64=base64 of dedicated publisher .sk (NOT owner cb37)

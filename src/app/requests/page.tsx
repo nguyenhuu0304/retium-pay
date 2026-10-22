@@ -1,4 +1,5 @@
 "use client";
+import { LocalTransactionHistory } from "../../components/local-transaction-history";
 import {
   MemberIdentity,
   type TelegramName,
@@ -363,6 +364,7 @@ export default function RequestsPage() {
               />
             }
           </p>
+          <LocalTransactionHistory wallet={address} />
           <div className="hero-actions">
             {!ready && <UiText text="Restoring wallet…" />}
             {ready && !address && <WalletRequired />}
@@ -750,3 +752,4 @@ export default function RequestsPage() {
     </>
   );
 }
+

@@ -1,4 +1,6 @@
 "use client";
+import { publicStatus, decodePlan } from "../../lib/transactions/public-status";
+import { saveReceipt, syncHistory } from "../../lib/transactions/history";
 
 import { withDeadline } from "../../lib/dex/request-state";
 import { CopyValue } from "../../components/copy-value";
@@ -10,7 +12,6 @@ import {
 } from "../../components/shared-wallet";
 import { assessFunding } from "../../lib/dex/funding";
 import { tokenPage, marketSummary, reviewSnapshot } from "../../lib/dex/browser";
-import Link from "next/link";
 import "./dex.css";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -131,11 +132,6 @@ export default function DexPage() {
     [preview, setPreview] = useState<Preview | null>(null),
     [busy, setBusy] = useState(false),
     [notice, setNotice] = useState(""),
-    [session, setSession] = useState(false),
-    [challenge, setChallenge] = useState<{
-      nonce: string;
-      statement: string;
-    } | null>(null),
     [job, setJob] = useState<Job | null>(null),
     [pending, setPending] = useState<Recovery | null>(null),
     [unknown, setUnknown] = useState(false),
@@ -213,7 +209,7 @@ export default function DexPage() {
           ) {
             setPending(p);
             setNotice(
-              "A submitted TX was restored. Connect its wallet, sign in and check it before sending anything else.",
+              "A submitted TX was restored. Connect its wallet and check it before sending anything else.",
             );
           } else if (p.unknown) {
             setUnknown(true);
@@ -235,11 +231,8 @@ export default function DexPage() {
   const shouldWatch =
     !!trackedTx &&
     !!wallet &&
-    session &&
     wallet === trackedWallet &&
-    (!job ||
-      job.state === "pending" ||
-      ["pending", "sending"].includes(job.notice));
+    (!job || job.state === "pending");
   useEffect(() => {
     if (!shouldWatch || !trackedTx || !pending) return;
     let stopped = false,
@@ -248,16 +241,10 @@ export default function DexPage() {
     const saved = pending;
     async function poll() {
       try {
-        await post("/api/payments", {
-          operation: "dexRegister",
-          txId: saved.txId,
-          ticket: saved.ticket,
-        });
-        if (stopped) return;
-        const data = await post("/api/payments", {
-          operation: "dexCheck",
-          txId: saved.txId,
-        });
+        const observed = await publicStatus(saved.ticket,saved.txId,saved.wallet);
+        const data = {job: observed};
+        saveReceipt({...observed});
+        void syncHistory(saved.ticket,saved.txId,saved.wallet);
         if (stopped) return;
         failures = 0;
         setJob(data.job);
@@ -275,15 +262,10 @@ export default function DexPage() {
               "Transaction needs review. Do not resend automatically.",
           );
         const watch =
-          data.job.state === "pending" ||
-          ["pending", "sending"].includes(data.job.notice);
+          data.job.state === "pending";
         if (watch) timer = setTimeout(poll, 5000);
       } catch (error) {
         if (stopped) return;
-        if (/session expired|sign in with your wallet/i.test(message(error))) {
-          setSession(false);
-          return;
-        }
         failures++;
         setNotice(
           `Status check unavailable: ${message(error)} No transaction has been resent.`,
@@ -299,70 +281,12 @@ export default function DexPage() {
       stopped = true;
       if (timer) clearTimeout(timer);
     };
-  }, [shouldWatch, trackedTx, trackedWallet, wallet, session, pending]);
+  }, [shouldWatch, trackedTx, trackedWallet, wallet, pending]);
   const change = () => {
     epoch.current++;
     setPreview(null);
     setConfirmed(false);
   };
-  useEffect(() => {
-    if (!wallet) return;
-    const c = new AbortController();
-    fetch("/api/payments?action=session", {
-      cache: "no-store",
-      signal: c.signal,
-    })
-      .then((r) => r.json())
-      .then((d) => {
-        if (!c.signal.aborted)
-          setSession(d.address === wallet && d.expiresAt > Date.now());
-      })
-      .catch(() => {});
-    return () => c.abort();
-  }, [wallet]);
-  async function prepareSession() {
-    setBusy(true);
-    try {
-      const d = await post("/api/payments", {
-        action: "prepareList",
-        address: wallet,
-      });
-      setChallenge(d);
-      setNotice(
-        "Click Verify wallet next. This signature does not send funds.",
-      );
-    } catch (e) {
-      setNotice(message(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function signSession() {
-    if (!challenge || running.current) return;
-    running.current = true;
-    setBusy(true);
-    try {
-      const p = provider();
-      if (!p) throw Error("Wallet unavailable.");
-      const auth = (await p.request({
-        method: "retium_signAuth",
-        params: challenge,
-      })) as Record<string, unknown>;
-      if (auth.address !== wallet)
-        throw Error("Wallet account changed. Connect again.");
-      await post("/api/payments", { action: "verifyList", ...auth });
-      setSession(true);
-      setChallenge(null);
-      setNotice(
-        "Signed session ready. Telegram messages go to the account linked to this wallet.",
-      );
-    } catch (e) {
-      setNotice(message(e));
-    } finally {
-      running.current = false;
-      setBusy(false);
-    }
-  }
   async function loadPools() {
     if (busy || cursor === null) return;
     setBusy(true);
@@ -451,13 +375,11 @@ export default function DexPage() {
     }
   }
   async function save(r: Recovery) {
-    const d = await post("/api/payments", {
-      operation: "dexRegister",
-      txId: r.txId,
-      ticket: r.ticket,
-    });
-    setJob(d.job);
-    return d.job;
+    const observed=await publicStatus(r.ticket,r.txId,r.wallet);
+    setJob(observed);
+    saveReceipt({...observed});
+    void syncHistory(r.ticket,r.txId,r.wallet);
+    return observed;
   }
   async function execute() {
     if (!preview || running.current || !confirmed || pending || unknown) return;
@@ -501,11 +423,12 @@ export default function DexPage() {
       const recovery = { wallet, txId: result.txId, ticket: ready.ticket };
       localStorage.setItem(recoveryKey, JSON.stringify(recovery));
       setPending(recovery);
+      saveReceipt({txId:result.txId,wallet,plan:decodePlan(ready.ticket),state:"pending"});
       setUnknown(false);
       try {
         await save(recovery);
         setNotice(
-          "TX submitted and saved — awaiting independent verification. Do not send again. Telegram confirmation follows only after verification.",
+          "TX submitted and saved — awaiting independent verification. Do not send again. Status is checked directly from the public chain API.",
         );
       } catch (e) {
         setNotice(
@@ -533,14 +456,10 @@ export default function DexPage() {
     }
   }
   async function check() {
-    if (!pending || !session || pending.wallet !== wallet) return;
+    if (!pending || pending.wallet !== wallet) return;
     setBusy(true);
     try {
-      await save(pending);
-      const d = await post("/api/payments", {
-        operation: "dexCheck",
-        txId: pending.txId,
-      });
+      const d = {job: await save(pending)};
       setJob(d.job);
       setNotice(
         d.job.state === "confirmed"
@@ -576,7 +495,7 @@ export default function DexPage() {
     setJob(null);
     change();
     setMarketVersion((value) => value + 1);
-    setNotice("Returned to Swap. Your previous TX remains registered for background verification. Telegram delivery does not block new actions. Do not repeat the previous swap while its outcome is unknown.");
+    setNotice("Returned to Swap. Your previous TX remains registered for background verification. Status checks continue independently of this form. Do not repeat the previous swap while its outcome is unknown.");
   }
   function finish() {
     if (!job || !["confirmed", "failed"].includes(job.state)) return;
@@ -714,11 +633,7 @@ export default function DexPage() {
           ? "Select wallet on Dashboard"
           : !token
             ? "Select token"
-            : !session
-              ? challenge
-                ? "Verify wallet"
-                : "Enable Telegram tracking"
-              : action === "swap"
+            : action === "swap"
                 ? "Review swap"
                 : action === "add"
                   ? "Review deposit"
@@ -730,10 +645,7 @@ export default function DexPage() {
   const primaryAction = () => {
     if (!wallet) return;
     else if (!token) openPicker();
-    else if (!session) {
-      if (challenge) void signSession();
-      else void prepareSession();
-    } else void prepare();
+    else void prepare();
   };
   const stage = preview
     ? "review"
@@ -755,28 +667,7 @@ export default function DexPage() {
         <div className="dex-code">
           {wallet ? short(wallet) : <WalletRequired />}
         </div>
-        {wallet && (
-          <span className="dex-tag">
-            {session ? (
-              <UiText text={"Connected · tracking ready"} />
-            ) : (
-              <UiText text={"Connected"} />
-            )}
-          </span>
-        )}
-        {wallet && !session && pending && (
-          <button
-            disabled={busy}
-            onClick={challenge ? signSession : prepareSession}
-          >
-            {challenge ? (
-              <UiText text={"Verify wallet for status"} />
-            ) : (
-              <UiText text={"Restore tracking session"} />
-            )}
-          </button>
-        )}
-        <Link href="/telegram">{<UiText text={"Telegram settings"} />}</Link>
+        {wallet && <span className="dex-tag"><UiText text="Connected" /></span>}
       </div>
       {stage !== "form" && (
         <div className="dex-stage-context">
@@ -1207,17 +1098,6 @@ export default function DexPage() {
         >
           {<UiText text={primaryLabel} />}
         </button>
-        {wallet && !session && token && (
-          <p className="dex-muted">
-            {
-              <UiText
-                text={
-                  "Verify this wallet once to track transactions and send confirmations to your linked Telegram."
-                }
-              />
-            }
-          </p>
-        )}
         {token && (
           <details className="contract-details">
             <summary>{<UiText text={"Token details"} />}</summary>
@@ -1381,7 +1261,7 @@ export default function DexPage() {
           </h2>
           <p className="dex-code"><CopyValue value={pending.txId} /></p>
           <button
-            disabled={busy || !session || wallet !== pending.wallet}
+            disabled={busy || wallet !== pending.wallet}
             onClick={check}
           >
             {<UiText text={"Check status now"} />}
@@ -1399,8 +1279,7 @@ export default function DexPage() {
                     job.state
                   )}
                 </b>{" "}
-                {<UiText text={"· Telegram: "} />}
-                {<UiText text={job.notice} />}
+
               </p>
               <p>{job.error}</p>
               {["confirmed", "failed"].includes(job.state) && (
@@ -1567,3 +1446,4 @@ export default function DexPage() {
     </main>
   );
 }
+

@@ -1,0 +1,20 @@
+{
+  "targets": {
+    "release": {
+      "outFile": "build/retium_lending.wasm",
+      "optimizeLevel": 3,
+      "shrinkLevel": 2,
+      "converge": true,
+      "noAssert": false
+    }
+  },
+  "options": {
+    "runtime": "stub",
+    "use": [
+      "abort="
+    ],
+    "memoryBase": 65536,
+    "exportStart": false,
+    "maximumMemory": 512
+  }
+}

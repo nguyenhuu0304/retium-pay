@@ -79,10 +79,9 @@ export async function snapshot(c: LendingConfig, wallet: string) {
   const market = fields(rawMarket),
     position = fields(rawPosition);
   if (
-    market.version !== "v0.1.0" ||
+    !((market.version === "v0.1.0" && market.oracle_mode === "admin_test_feed") || (market.version === "v0.2.0" && market.oracle_mode === "safehouse_reference_feed")) ||
     market.asset !== c.asset ||
     market.asset_hash !== c.assetCodeHash ||
-    market.oracle_mode !== "admin_test_feed" ||
     market.testnet_only !== "true" ||
     position.account !== wallet
   )

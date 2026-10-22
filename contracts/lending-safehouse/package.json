@@ -1,0 +1,15 @@
+{
+  "name": "retiumpay-lending-contract",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/metadata.mjs && asc assembly/index.ts --config asconfig.json --target release",
+    "test": "node tests/runtime.mjs && asc tests/math.ts --runtime stub --memoryBase 65536 --use abort= --outFile build/math-test.wasm && node tests/math.mjs"
+  },
+  "devDependencies": {
+    "assemblyscript": "0.28.20",
+    "as-bignum": "0.3.1",
+    "assemblyscript-json": "1.1.0"
+  }
+}

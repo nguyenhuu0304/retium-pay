@@ -1,0 +1,28 @@
+import {registerHooks} from 'node:module';import {readFileSync,existsSync} from 'node:fs';import {fileURLToPath,pathToFileURL} from 'node:url';import ts from 'typescript';import assert from 'node:assert/strict';
+registerHooks({resolve(s,c,next){if(s.startsWith('.')&&c.parentURL?.startsWith('file:')){const p=fileURLToPath(new URL(s,c.parentURL));if(existsSync(p+'.ts'))return {url:pathToFileURL(p+'.ts').href,shortCircuit:true};}return next(s,c);},load(url,c,next){if(url.endsWith('.ts'))return {source:ts.transpileModule(readFileSync(fileURLToPath(url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.ESNext}}).outputText,format:'module',shortCircuit:true};return next(url,c);}});
+const {SETUP_OWNER,SETUP_ASSET,SETUP_ASSET_HASH,checkedSetupTx}=await import('../../src/lib/lending/setup-safehouse.ts');
+const id='tx_'+'a'.repeat(32),market='1'.repeat(64);
+const tx={tx_id:id,sender:SETUP_OWNER,action:'deploy',recipient:market,amount:'0',exec_status:'ok',finality:'HardFinal'};
+assert.equal(checkedSetupTx(tx,id,'deploy',''),'confirmed');
+assert.throws(()=>checkedSetupTx({...tx,sender:'rete'+'b'.repeat(68)},id,'deploy',''));
+assert.throws(()=>checkedSetupTx({...tx,amount:'1'},id,'deploy',''));
+assert.equal(checkedSetupTx({...tx,finality:'Pending'},id,'deploy',''),'pending');
+assert.equal(checkedSetupTx({...tx,exec_status:'error'},id,'deploy',''),'failed');
+const init={...tx,action:'call',call:{contract:market,method:'init',args:[SETUP_ASSET,SETUP_ASSET_HASH]}};
+assert.equal(checkedSetupTx(init,id,'init',market),'confirmed');
+assert.throws(()=>checkedSetupTx({...init,call:{...init.call,args:['bad']}},id,'init',market));
+assert.throws(()=>checkedSetupTx({...init,call:{...init.call,method:'borrow'}},id,'init',market));
+assert.throws(()=>checkedSetupTx({...init,recipient:'2'.repeat(64)},id,'init',market));
+console.log('PASS Safehouse wallet37 setup: sender, action, amount, finality, execution, market, init method and asset checks.');
+
+const {blake3}=await import('@noble/hashes/blake3.js');
+const wasm=readFileSync(new URL('../../public/contracts/retium_lending_safehouse.wasm',import.meta.url));
+const {SETUP_HASH,SETUP_METADATA}=await import('../../src/lib/lending/setup-safehouse.ts');
+assert.equal(Buffer.from(blake3(wasm)).toString('hex'),SETUP_HASH);
+assert.equal(SETUP_METADATA.version,'v0.2.0');
+assert.ok(SETUP_METADATA.traits.includes('safehouse_reference_feed'));
+const page=readFileSync(new URL('../../src/app/lending/setup-safehouse/page.tsx',import.meta.url),'utf8');
+assert.ok(page.includes('retium-pay:lending-setup-safehouse:owner37:v2'));
+assert.ok(page.includes('/contracts/retium_lending_safehouse.wasm'));
+assert.ok(!page.includes('fetch("/contracts/retium_lending.wasm"'));
+console.log('PASS WASM Blake3 pin, v0.2 metadata and setup state isolation.');

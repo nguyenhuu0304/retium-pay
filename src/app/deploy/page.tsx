@@ -1,4 +1,6 @@
 "use client";
+import { publicStatus, decodePlan } from "../../lib/transactions/public-status";
+import { saveReceipt, syncHistory } from "../../lib/transactions/history";
 import { deploymentAccount } from "../../lib/dex/deploy-browser";
 import { CopyValue } from "../../components/copy-value";
 import { UiText, UiInput } from "../../components/preferences";
@@ -7,7 +9,6 @@ import {
   useSharedWallet,
   WalletRequired,
 } from "../../components/shared-wallet";
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { Plan } from "../../lib/dex/math";
 import "../tools.css";
@@ -40,10 +41,6 @@ async function post(url: string, body: object) {
 export default function Deploy() {
   const { account } = useSharedWallet();
   const wallet = account?.address || "";
-  const [session, setSession] = useState(false);
-  const [challenge, setChallenge] = useState<Record<string, unknown> | null>(
-    null,
-  );
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
   const [supply, setSupply] = useState("");
@@ -96,36 +93,27 @@ export default function Deploy() {
     }, 60000);
     return () => clearTimeout(timer);
   }, [preview]);
-  const jobState = job?.state,
-    jobNotice = job?.notice;
+  const jobState = job?.state;
   useEffect(() => {
     if (
       !saved?.txId ||
-      !session ||
       saved.wallet !== wallet ||
-      (jobState &&
-        jobState !== "pending" &&
-        !["pending", "sending"].includes(jobNotice || ""))
+      (jobState && jobState !== "pending")
     )
       return;
     let stopped = false;
     let timer: ReturnType<typeof setTimeout>;
     async function tick() {
       try {
-        await post("/api/payments", {
-          operation: "dexRegister",
-          ticket: saved!.ticket,
-          txId: saved!.txId,
-        });
-        const d = await post("/api/payments", {
-          operation: "dexCheck",
-          txId: saved!.txId,
-        });
+        const observed=await publicStatus(saved!.ticket,saved!.txId!,saved!.wallet);
+        const d={job:observed};
+        saveReceipt({...observed});
+        void syncHistory(saved!.ticket,saved!.txId!,saved!.wallet);
         if (!stopped) setJob(d.job);
       } catch (e) {
         if (!stopped)
           setNotice(
-            `${err(e)} Restore the wallet session if it expired. The background monitor keeps registered transactions.`,
+            `${err(e)} No transaction has been resent.`,
           );
       } finally {
         if (!stopped) timer = setTimeout(tick, 7000);
@@ -136,7 +124,7 @@ export default function Deploy() {
       stopped = true;
       clearTimeout(timer);
     };
-  }, [saved, session, wallet, jobState, jobNotice]);
+  }, [saved, wallet, jobState]);
   async function action(fn: () => Promise<void>) {
     if (running.current) return;
     running.current = true;
@@ -149,48 +137,6 @@ export default function Deploy() {
       running.current = false;
       setBusy(false);
     }
-  }
-  useEffect(() => {
-    if (!wallet) return;
-    const c = new AbortController();
-    fetch("/api/payments?action=session", {
-      cache: "no-store",
-      signal: c.signal,
-    })
-      .then((r) => r.json())
-      .then((d) => {
-        if (!c.signal.aborted)
-          setSession(d.address === wallet && d.expiresAt > Date.now());
-      })
-      .catch(() => {});
-    return () => c.abort();
-  }, [wallet]);
-  function authenticate() {
-    void action(async () => {
-      if (!challenge) {
-        setChallenge(
-          await post("/api/payments", {
-            action: "prepareList",
-            address: wallet,
-          }),
-        );
-        setNotice("Click Verify wallet. This signature does not send funds.");
-        return;
-      }
-      if (!window.retium) throw Error("Wallet unavailable.");
-      const auth = (await window.retium.request({
-        method: "retium_signAuth",
-        params: challenge,
-      })) as Record<string, unknown>;
-      if (auth.address !== wallet)
-        throw Error("Wallet account changed. Reconnect.");
-      await post("/api/payments", { action: "verifyList", ...auth });
-      setSession(true);
-      setChallenge(null);
-      setNotice(
-        "Tracking ready. Telegram uses the account linked to this wallet.",
-      );
-    });
   }
   function review() {
     void action(async () => {
@@ -213,8 +159,8 @@ export default function Deploy() {
   }
   function deploy() {
     void action(async () => {
-      if (!preview || !agreed || !session || !window.retium || saved)
-        throw Error("Review the token and enable tracking first.");
+      if (!preview || !agreed || !window.retium || saved)
+        throw Error("Review the token first.");
       if (Date.now() > preview.plan.expiresAt)
         throw Error("Preview expired. Review again.");
       const hold: Saved = {
@@ -246,12 +192,8 @@ export default function Deploy() {
           throw Error(
             "Wallet returned a different contract ID. Do not retry; check the Explorer.",
           );
-        const d = await post("/api/payments", {
-          operation: "dexRegister",
-          ticket: next.ticket,
-          txId: next.txId,
-        });
-        setJob(d.job);
+        saveReceipt({txId:result.txId,wallet,plan:decodePlan(next.ticket),state:"pending"});
+        void syncHistory(next.ticket,result.txId,wallet);
         setNotice(
           "Submitted. Waiting for HardFinal and contract code verification.",
         );
@@ -285,22 +227,7 @@ export default function Deploy() {
       <div className="tool-grid">
         <section className="tool-card">
           {!wallet && <WalletRequired />}
-          {wallet && (
-            <>
-              <p className="wrap">
-                <CopyValue value={wallet} />
-              </p>
-              <button disabled={busy} onClick={authenticate}>
-                {session ? (
-                  <UiText text={"Refresh tracking session"} />
-                ) : challenge ? (
-                  <UiText text={"Verify wallet"} />
-                ) : (
-                  <UiText text={"Enable Telegram tracking"} />
-                )}
-              </button>
-            </>
-          )}
+          {wallet && <p className="wrap"><CopyValue value={wallet} /></p>}
           <label>
             {<UiText text={"Token name"} />}
             <UiInput
@@ -348,7 +275,7 @@ export default function Deploy() {
             }
           </p>
           <button
-            disabled={busy || !ready || !wallet || !session || !!saved}
+            disabled={busy || !ready || !wallet || !!saved}
             onClick={review}
           >
             {<UiText text={"Review token"} />}
@@ -432,25 +359,6 @@ export default function Deploy() {
                 )}
               </p>
               {job?.error && <p>{job.error}</p>}
-              {job && (
-                <p>
-                  {<UiText text={"Telegram: "} />}
-                  {<UiText text={job.notice} />}
-                  {job.notice === "unlinked" && (
-                    <>
-                      {" "}
-                      —{" "}
-                      <Link href="/telegram">
-                        {
-                          <UiText
-                            text={"link your Telegram for future transactions"}
-                          />
-                        }
-                      </Link>
-                    </>
-                  )}
-                </p>
-              )}
               {!saved.txId && (
                 <label>
                   {<UiText text={"Recover TX ID from Wallet history"} />}
@@ -507,7 +415,7 @@ export default function Deploy() {
         {
           <UiText
             text={
-              "Contract creation uses your Web Wallet signature. Never enter a seed phrase or private key here. Keep the Background Monitor running for Telegram delivery when this page is closed."
+              "Contract creation uses your Web Wallet signature. Never enter a seed phrase or private key here. Check transaction status here or in My History."
             }
           />
         }
@@ -515,3 +423,4 @@ export default function Deploy() {
     </main>
   );
 }
+
