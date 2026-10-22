@@ -15,6 +15,8 @@ import {
 import { repayLimits, collateralAvailable, borrowAvailable } from "../../lib/lending/amounts";
 import { units, fmt, type Plan } from "../../lib/dex/math";
 import "./lending.css";
+import { SafehouseRefresh } from "./safehouse-refresh";
+import { displayAmount, healthDisplay } from "./display";
 type Preview = { plan: Plan; ticket: string; displayAmount?: string };
 type Pending = {
   wallet: string;
@@ -26,12 +28,7 @@ type Pending = {
 // Compare allowance with the repayment plus a small signing-time margin.
 // A new approval grants a larger 0.1% buffer. Never require that entire
 // buffer again after every accrual, or approvals repeat indefinitely.
-function shortAmount(value: string) {
-  const [whole, fraction = ""] = value.split(".");
-  if (!fraction) return whole;
-  const trimmed = fraction.slice(0, 6).replace(/0+$/, "");
-  return whole === "0" && !trimmed && /[1-9]/.test(fraction) ? "<0.000001" : whole + (trimmed ? "." + trimmed : "");
-}
+const shortAmount = displayAmount;
 const recoveryPrefix = "retium-pay:lending:pending:v1:";
 const error = (e: unknown) => {
   if (e && typeof e === "object") {
@@ -62,6 +59,7 @@ export default function Lending() {
     [action, setAction] = useState<LendingAction>("supply"),
     [amount, setAmount] = useState(""),
     [useMax, setUseMax] = useState(false),
+    [editingAmount, setEditingAmount] = useState(false),
     [preview, setPreview] = useState<Preview | null>(null),
     [pending, setPending] = useState<Pending | null>(null),
     [notice, setNotice] = useState(""),
@@ -293,11 +291,8 @@ export default function Lending() {
       }
       if (action === "withdraw_collateral") total = collateralAvailable(fresh.position, fresh.market);
       if (action === "deposit_collateral") {
-        const accountBalance = await readPublic(`wallet/${wallet}`);
-        const value = accountBalance.spendable ?? accountBalance.balance_rtm;
-        if (typeof value !== "string" || !/^[0-9]+(?:\.[0-9]{1,18})?$/.test(value))
-          throw Error("RTM balance unavailable. Refresh and retry.");
-        const balance = units(value);
+        if (fresh.rtmBalance == null) throw Error("RTM balance unavailable. Refresh and retry.");
+        const balance = BigInt(fresh.rtmBalance);
         // Keep 1 RTM for this transaction and subsequent gas; never sweep the wallet.
         total = balance > 10n ** 18n ? balance - 10n ** 18n : 0n;
       }
@@ -418,12 +413,33 @@ export default function Lending() {
     const timer = setInterval(() => { if (!document.hidden) void check(); }, 8000);
     return () => clearInterval(timer);
   }, [pending, wallet, check]);
+  const selectedUnit = action.includes("collateral") ? "RTM" : symbol;
+  const actionNames: Record<LendingAction, string> = {supply:"Supply RTD",withdraw:"Withdraw RTD",borrow:"Borrow RTD",repay:"Repay RTD",deposit_collateral:"Deposit RTM collateral",withdraw_collateral:"Withdraw RTM collateral"};
+  const amountIsPositive = (() => {try{return units(amount)>0n;}catch{return false;}})();
+  const allowanceStep = ["supply", "repay"].includes(action);
+  const health = data ? healthDisplay(data.position.health_factor,data.position.debt,data.market.price_fresh === "true") : null;
+  const shownAvailable = (() => {
+    if(!data)return "—";
+    if(action === "supply" || action === "repay")return fmt(BigInt(data.balance));
+    if(action === "withdraw")return fmt(BigInt(data.position.supplied));
+    if(action === "borrow")return fmt(borrowAvailable(data.position,data.market));
+    if(action === "withdraw_collateral")return fmt(collateralAvailable(data.position,data.market));
+    return data.rtmBalance == null ? null : fmt(BigInt(data.rtmBalance));
+  })();
+  const estimate = (() => {
+    if(!data || !amountIsPositive)return null;
+    try {
+      const n=units(preview && !preview.plan.approval ? preview.displayAmount || amount : amount);
+      const key=action === "supply" || action === "withdraw" ? "supplied" : action.includes("collateral") ? "collateral" : "debt";
+      const base=BigInt(data.position[key]);
+      const add=["supply","deposit_collateral","borrow"].includes(action);
+      return {key,value:fmt(add ? base+n : n>base ? 0n : base-n)};
+    } catch {return null;}
+  })();
   return (
-    <main className="lending-page">
+    <main className="lending-page lending-redesign">
       <div className="eyebrow">RETIUM PAY · TESTNET</div>
-      <h1>
-        <UiText text="Lending & Borrowing" />
-      </h1>
+      <div className="lending-title-row"><h1><UiText text="Lending & Borrowing" /></h1><span className="lending-badge">Testnet</span></div>
       <p className="muted">
         <UiText text="Supply a debt asset. Use RTM as collateral. Keep control of every signature." />
       </p>
@@ -455,40 +471,31 @@ export default function Lending() {
       ) : (
         <div className="lending-grid">
           <section className="lending-card">
-            <h2>
-              <UiText text="Your action" />
-            </h2>
-            <div style={{ display: "flex", gap: 8 }}>
+            <h2 className="sr-only"><UiText text="Your action" /></h2>
+            <div className="lending-group-tabs">
               <button disabled={busy || !!pending || adminBlocked} aria-pressed={group === "save"} className={group === "save" ? "primary" : ""}
-                onClick={() => { setGroup("save"); change("supply"); }}>Supply / Withdraw</button>
+                onClick={() => { setGroup("save"); change("supply"); }}><UiText text="Supply / Withdraw" /></button>
               <button disabled={busy || !!pending || adminBlocked} aria-pressed={group === "borrow"} className={group === "borrow" ? "primary" : ""}
-                onClick={() => { setGroup("borrow"); change("deposit_collateral"); }}>Borrow / Repay</button>
+                onClick={() => { setGroup("borrow"); change("deposit_collateral"); }}><UiText text="Borrow / Repay" /></button>
             </div>
             {group === "borrow" && data && data.market.price_fresh !== "true" && <div className="warning" role="status">Price feed expired. Borrowing is paused until a fresh update. Repayment remains available.</div>}
             <p className="muted">{group === "save" ? "Supply RTD to the pool, or withdraw your supplied balance when liquidity is available." : "1. Deposit RTM collateral → 2. Borrow RTD → 3. Repay → 4. Withdraw collateral."}</p>
+            {!pending && <div className="lending-action-tabs" role="group" aria-label="Lending action">
+              {actions.filter(a => group === "save" ? ["supply","withdraw"].includes(a) : !["supply","withdraw"].includes(a)).map(a => <button key={a} type="button" aria-pressed={a===action} disabled={busy || !!preview || adminBlocked} onClick={()=>change(a)}><UiText text={({supply:"Supply",withdraw:"Withdraw",borrow:"Borrow",repay:"Repay",deposit_collateral:"Deposit collateral",withdraw_collateral:"Withdraw collateral"})[a]} /></button>)}
+            </div>}
+            {!pending && <div className="lending-steps" aria-label="Transaction steps">
+              {allowanceStep && <div className={!needsApproval && amountIsPositive ? "step complete" : "step"}><span>{!needsApproval && amountIsPositive ? "✓" : "1"}</span><div><strong><UiText text={`Approve ${symbol}`} /></strong><small><UiText text={!needsApproval && amountIsPositive ? "Allowance available · checked again before signing" : "Permission only · funds stay in your wallet"} /></small></div></div>}
+              <div className="step current"><span>{allowanceStep ? "2" : "1"}</span><div><strong><UiText text={actionNames[action]} /></strong><small><UiText text={allowanceStep ? "Separate transaction · moves funds" : "Review first · sign in your wallet"} /></small></div></div>
+            </div>}
             {!preview && !pending && <>
-            <label htmlFor="lending-action">
-              <UiText text="Action" />
-            </label>
-            <select
-              id="lending-action"
-              value={action}
-              onChange={(e) => change(e.target.value as LendingAction)}
-              disabled={busy}
-            >
-              {actions.filter((a) => group === "save" ? ["supply", "withdraw"].includes(a) : !["supply", "withdraw"].includes(a)).map((a) => (
-                <option key={a} value={a}>
-                  {({ supply: "Supply RTD", withdraw: "Withdraw RTD", deposit_collateral: "Deposit RTM collateral", withdraw_collateral: "Withdraw RTM collateral", borrow: "Borrow RTD", repay: "Repay RTD" })[a]}
-                </option>
-              ))}
-            </select>
-            <label htmlFor="lending-amount">
-              <UiText text="Amount" />{" "}
-              {action.includes("collateral") ? "RTM" : config.symbol}
-            </label>
-            <input
+            <div className="lending-amount-label"><label htmlFor="lending-amount"><UiText text="Amount" /></label><span title={shownAvailable === null ? "Balance unavailable" : `${shownAvailable} ${selectedUnit}`}><UiText text={action === "withdraw" ? "Your supplied balance" : action === "borrow" || action === "withdraw_collateral" ? "Available for this action" : "Wallet balance"} />: {shownAvailable===null ? "—" : shortAmount(shownAvailable)} {selectedUnit}</span></div>
+            <div className="lending-amount-box"><input
               id="lending-amount"
-              value={amount}
+              value={editingAmount ? amount : displayAmount(amount)}
+              title={amount}
+              onFocus={() => setEditingAmount(true)}
+              onBlur={() => setEditingAmount(false)}
+              aria-describedby="lending-amount-help"
               inputMode="decimal"
               placeholder="0"
               onChange={(e) => {
@@ -497,8 +504,8 @@ export default function Lending() {
                 setPreview(null);
               }}
               disabled={busy}
-            />
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+            /><span>{selectedUnit}</span></div>
+            <div className="lending-presets">
               {[25, 50, 75, 100].map((percent) => (
                 <button key={percent} type="button" disabled={busy || !!pending || adminBlocked}
                   onClick={() => selectPercent(percent)}>
@@ -506,14 +513,14 @@ export default function Lending() {
                 </button>
               ))}
             </div>
-            <p aria-live="polite">
-              {action === "withdraw" ? "You will receive approximately" : action === "repay" ? "Estimated repayment" : "Selected amount"}: {amount || "0"} {action.includes("collateral") ? "RTM" : config.symbol}
-              {useMax ? action === "withdraw_collateral" ? " · Max withdrawable (interest margin retained)" : " · Max (full position)" : ""}
-            </p>
-            <p className="muted">
-              Enter a token amount, not a percentage. Your position is checked again before signing.
-              {action === "repay" ? " Interest can increase the final repayment slightly. Max repays all debt shares." : ""}
-            </p>
+            <p id="lending-amount-help" className="muted"><UiText text="Display shortened to 4 decimals. Focus to edit the exact amount; transaction precision is retained." /></p>
+            {useMax && <p className="lending-inline-note"><UiText text={action === "withdraw_collateral" ? "Max withdrawable · interest margin retained" : "Max selects the full position"} /></p>}
+            <div className="lending-review-summary">
+              <div><span><UiText text={actionNames[action]} /></span><strong>{amountIsPositive ? shortAmount(amount) : "—"} {selectedUnit}</strong></div>
+              {estimate && <div><span><UiText text={estimate.key === "supplied" ? "Estimated supplied balance after" : estimate.key === "collateral" ? "Estimated collateral after" : "Estimated debt after"} /></span><strong>≈ {shortAmount(estimate.value)} {selectedUnit}</strong></div>}
+              <div><span><UiText text="Network fee" /></span><span><UiText text="Paid in RTM · shown in wallet" /></span></div>
+            </div>
+            <div className="lending-cta-row">
             <button onClick={refresh} disabled={busy}>
               <UiText text="Refresh position" />
             </button>
@@ -522,14 +529,14 @@ export default function Lending() {
               onClick={review}
               disabled={busy || !!pending || adminBlocked}
             >
-              {busy ? "Checking…" : nextLabel}
-            </button>
-            <p className="muted">Step 1: prepare · Step 2: confirm and sign</p>
+              <UiText text={busy ? "Checking…" : nextLabel} />
+            </button></div>
+            <p className="muted"><UiText text="Prepare reads the latest position. Only Confirm & sign opens your wallet." /></p>
             </>}
-            <p role="status" aria-live="polite" className="status">{notice}</p>
-            {lastTx && <p>Last confirmed TX: <CopyValue value={lastTx} /></p>}
+            {notice && <p role="status" aria-live="polite" className="status lending-notice">{notice}</p>}
+            {lastTx && <div className="lending-tx-panel confirmed"><div className="lending-panel-heading"><strong><UiText text="Transaction status" /></strong><span className="lending-badge"><UiText text="Confirmed" /></span></div><p><UiText text="HardFinal · execution OK" /></p><div className="lending-tx-links"><CopyValue value={lastTx} compact /><Link href={`/explorer?tx=${lastTx}`}><UiText text="View in Explorer" /></Link></div></div>}
             {preview && (
-              <div className="preview">
+              <div className="preview lending-sign-review">
                 <h3>{preview.plan.approval ? `Approve ${symbol}` : actionLabel}</h3>
                 <p style={{ fontSize: 22, fontWeight: 700 }}>{shortAmount(preview.displayAmount || amount)} {action.includes("collateral") && !preview.plan.approval ? "RTM" : symbol}</p>
                 <p>{preview.plan.approval ? "This only grants token permission. After confirmation, continue with the lending action." : action === "repay" ? "Repayment includes accrued interest and can increase slightly before execution." : "Confirm this amount and the selected wallet in the signing window."}</p>
@@ -539,8 +546,8 @@ export default function Lending() {
                   <code>{preview.plan.call.method}({preview.plan.call.args.join(", ")})</code>
                   <p>Attached RTM: {fmt(BigInt(preview.plan.call.amountAtomic))}</p>
                 </details>
-                <button className="primary" onClick={execute} disabled={busy}>
-                  Confirm &amp; sign
+                <button className="primary lending-sign-button" onClick={execute} disabled={busy}>
+                  <UiText text="Confirm & sign" />
                 </button>
                 <button onClick={() => setPreview(null)}>
                   <UiText text="Back" />
@@ -548,12 +555,12 @@ export default function Lending() {
               </div>
             )}
             {pending && (
-              <div className="preview">
-                <p>
-                  <UiText text="A submitted or uncertain transaction is saved. Do not send it twice." />
-                </p>
+              <div className="preview lending-tx-panel">
+                <div className="lending-panel-heading"><strong><UiText text="Transaction status" /></strong><span className="lending-badge"><UiText text={pending.txId ? "Checking" : "Needs verification"} /></span></div>
+                <div className="lending-tx-progress"><span className={pending.txId ? "done" : ""}><UiText text="Submitted" /></span><span aria-hidden="true">→</span><span className="current"><UiText text="Verify execution" /></span><span aria-hidden="true">→</span><span>HardFinal</span></div>
+                <p className="lending-inline-note"><UiText text="A submitted or uncertain transaction is saved. Do not send it twice." /></p>
                 {pending.txId ? (
-                  <CopyValue value={pending.txId} />
+                  <CopyValue value={pending.txId} compact />
                 ) : (
                   <input
                     aria-label="Recovery TX ID"
@@ -571,66 +578,33 @@ export default function Lending() {
               </div>
             )}
           </section>
-          <aside className="lending-card">
+          <aside className="lending-card lending-position-card">
             <h2>
               <UiText text="Your position" />
             </h2>
             {data ? (
               <>
-                <dl>
-                  <dt>
-                    <UiText text="Supplied" />
-                  </dt>
-                  <dd>
-                    {shortAmount(fmt(BigInt(data.position.supplied)))} {config.symbol}
-                  </dd>
-                  <dt>
-                    <UiText text="Collateral" />
-                  </dt>
-                  <dd>{shortAmount(fmt(BigInt(data.position.collateral)))} RTM</dd>
-                  <dt>
-                    <UiText text="Debt" />
-                  </dt>
-                  <dd>
-                    {shortAmount(fmt(BigInt(data.position.debt)))} {config.symbol}
-                  </dd>
-                  <dt>Health Factor</dt>
-                  <dd>
-                    {data.position.health_factor === "none"
-                      ? "—"
-                      : shortAmount(fmt(BigInt(data.position.health_factor)))}
-                  </dd>
-                  <dt>
-                    <UiText text="Available liquidity" />
-                  </dt>
-                  <dd>
-                    {shortAmount(fmt(BigInt(data.market.cash)))} {config.symbol}
-                  </dd>
-                  <dt>Borrow APR</dt>
-                  <dd>
-                    5% · <UiText text="variable balance" />
-                  </dd>
-                  <dt>LTV / liquidation</dt>
-                  <dd>50% / 70%</dd>
-                  <dt>
-                    <UiText text="Price status" />
-                  </dt>
-                  <dd>
-                    {data.market.price_fresh === "true" ? "Fresh" : "Expired"}
-                  </dd>
-                  <dt>
-                    <UiText text="Market" />
-                  </dt>
-                  <dd>{data.market.paused === "0" ? "Active" : "Paused"}</dd>
+                {health?.label === "No debt" ? <div className="lending-health lending-health-empty"><div className="lending-amount-label"><span>Health Factor</span><span className="lending-badge"><UiText text="No debt" /></span></div><p className="muted"><UiText text="No outstanding loan. Health Factor appears when you borrow." /></p></div> : health && <div className={`lending-health ${health.tone}`}><div className="lending-amount-label"><span>Health Factor</span><span className="lending-badge"><UiText text={health.label} /></span></div><strong className="lending-health-number">{health.value}</strong><div className="lending-health-track" role="meter" aria-label="Health Factor display, capped at 3" aria-valuemin={0} aria-valuemax={3} aria-valuenow={Number((health.percent*3/100).toFixed(2))} aria-valuetext={health.label === "No debt" ? "No debt" : `${health.value}; ${health.label}`}><span style={{left:`${health.percent}%`}} /></div><div className="lending-health-scale"><span><UiText text="At risk" /></span><span><UiText text="Caution" /></span><span><UiText text="Healthy" /></span></div><p className="muted"><UiText text="Liquidation below 1.00. Caution below 1.50 is a UI guide, not a contract threshold." /></p></div>}
+                <div className="lending-position-stats">
+                  <div><span><UiText text="Supplied" /></span><strong>{shortAmount(fmt(BigInt(data.position.supplied)))} <small>{symbol}</small></strong></div>
+                  <div><span><UiText text="Collateral" /></span><strong>{shortAmount(fmt(BigInt(data.position.collateral)))} <small>RTM</small></strong></div>
+                  <div><span><UiText text="Debt" /></span><strong>{shortAmount(fmt(BigInt(data.position.debt)))} <small>{symbol}</small></strong></div>
+                  <div><span>Borrow APR</span><strong>{displayAmount(fmt(BigInt(data.market.borrow_apr_bps || "500") * 10n ** 16n),2)}<small>%</small></strong></div>
+                </div>
+                <dl className="lending-market-stats">
+                  <dt><UiText text="Available liquidity" /></dt><dd>{shortAmount(fmt(BigInt(data.market.cash)))} {symbol}</dd>
+                  <dt>LTV / liquidation</dt><dd>{Number(data.market.ltv_bps || "5000")/100}% / {Number(data.market.liquidation_bps || "7000")/100}%</dd>
+                  <dt><UiText text="Price status" /></dt><dd><span className={`lending-status-dot ${data.market.price_fresh === "true" ? "ok" : "warn"}`} /><UiText text={data.market.price_fresh === "true" ? "Fresh" : "Expired"} /></dd>
+                  <dt><UiText text="Market" /></dt><dd><span className={`lending-status-dot ${data.market.paused === "0" ? "ok" : "warn"}`} /><UiText text={data.market.paused === "0" ? "Active" : "Paused"} /></dd>
                 </dl>
-                <details><summary>Exact balances</summary>
+                <details><summary><UiText text="Exact balances" /></summary>
                   <p>Supplied: {fmt(BigInt(data.position.supplied))} {symbol}</p>
                   <p>Collateral: {fmt(BigInt(data.position.collateral))} RTM</p>
                   <p>Debt: {fmt(BigInt(data.position.debt))} {symbol}</p>
                   <p>Liquidity: {fmt(BigInt(data.market.cash))} {symbol}</p>
                 </details>
                 <p className="muted">
-                  <UiText text="Health Factor below 1 permits liquidation. Price freshness: 15 minutes. Withdrawals require available liquidity." />
+                  <UiText text="Withdrawals require available liquidity." />
                 </p>
               </>
             ) : (
@@ -638,7 +612,7 @@ export default function Lending() {
                 <UiText text="Refresh to load your position." />
               </p>
             )}
-            <details><summary>Contract addresses</summary>
+            <details><summary><UiText text="Contract addresses" /></summary>
             <p className="muted">
               <UiText text="Market contract" />
             </p>
@@ -651,6 +625,7 @@ export default function Lending() {
         </div>
       )}
 
+      {config?.enabled && data?.market.oracle_mode === "safehouse_reference_feed" && (wallet === PRICE_OWNER || wallet === data.market.oracle) && <SafehouseRefresh key={wallet + config.market} config={config} wallet={wallet} chain={Number(account?.chainId)} oracle={data.market.oracle} disabled={busy || !!pending || !!preview} onBlocked={setAdminBlocked} onFresh={setData} />}
       {config?.enabled && data?.market.oracle_mode === "admin_test_feed" && wallet === PRICE_OWNER && <PriceAdmin key={wallet + config.market} config={config} wallet={wallet} chain={Number(account?.chainId)} disabled={busy || !!pending || !!preview}
         onBlocked={setAdminBlocked} onFresh={setData} />}
       <p className="muted">

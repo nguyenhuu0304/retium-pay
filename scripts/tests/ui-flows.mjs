@@ -15,7 +15,7 @@ function harness(relative){
  let slots=[],cursor=0,effects=[],dirty=true,tree,timers=new Map(),timerId=0,requested=[],receipts=[],lastPlan=null,lastTicket='',mode='ok',statusMode='confirmed',nonce=7;
  const storage=new Map();const account={address:wallet,chainId:3};
  const config={enabled:true,market,marketCodeHash:'3'.repeat(64),asset,assetCodeHash:'4'.repeat(64),symbol:'RTD',reason:''};
- const snapshot={market:{version:'v0.2.0',oracle_mode:'safehouse_reference_feed',cash:String(100n*U),assets:String(100n*U),supply_shares:String(100n*U),debt_shares:'0',index:String(U),paused:'0',asset_verified:'1',price_fresh:'true',price:String(U),borrow_apr_bps:'500',ltv_bps:'5000',liquidation_bps:'7000',price_ttl_ms:'900000'},position:{account:wallet,supplied:'0',supply_shares:'0',collateral:'0',debt_shares:'0',debt:'0',borrow_limit:'0',health_factor:'none'},nonce,balance:String(10n*U),allowance:'0'};
+ const snapshot={market:{version:'v0.2.0',oracle_mode:'safehouse_reference_feed',cash:String(100n*U),assets:String(100n*U),supply_shares:String(100n*U),debt_shares:'0',index:String(U),paused:'0',asset_verified:'1',price_fresh:'true',price:String(U),borrow_apr_bps:'500',ltv_bps:'5000',liquidation_bps:'7000',price_ttl_ms:'900000'},position:{account:wallet,supplied:'0',supply_shares:'0',collateral:'0',debt_shares:'0',debt:'0',borrow_limit:'0',health_factor:'none'},nonce,rtmBalance:String(10n*U),balance:String(10n*U),allowance:'0'};
  const storageAPI={getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,String(v)),removeItem:k=>storage.delete(k)};
  const depChanged=(a,b)=>!a||!b||a.length!==b.length||a.some((x,i)=>!Object.is(x,b[i]));
  const hooks={useState(init){const i=cursor++;if(!slots[i])slots[i]={value:typeof init==='function'?init():init};return[slots[i].value,v=>{const next=typeof v==='function'?v(slots[i].value):v;if(!Object.is(next,slots[i].value)){slots[i].value=next;dirty=true;}}];},useRef(init){const i=cursor++;if(!slots[i])slots[i]={current:init};return slots[i];},useEffect(fn,deps){const i=cursor++,old=slots[i];if(!old||depChanged(old.deps,deps)){old?.cleanup?.();slots[i]={deps};effects.push(()=>{const cleanup=fn();if(typeof cleanup==='function')slots[i].cleanup=cleanup;});}},useCallback(fn,deps){const i=cursor++,old=slots[i];if(!old||depChanged(old.deps,deps))slots[i]={deps,fn};return slots[i].fn;}};
@@ -29,6 +29,7 @@ function harness(relative){
  const status=async(ticket,txId,w)=>{if(mode==='status-error')throw Error('RPC unavailable');const plan=JSON.parse(Buffer.from(ticket.split('.')[0],'base64url').toString());return {txId,wallet:w,plan,state:statusMode,notice:'disabled',error:statusMode==='failed'?'Execution failed':''};};
  const fixtureMarket={token:asset,wallet,symbol:'NHT',pool:{token_b:asset,reserve_rtm:String(100n*U),reserve_token:String(100n*U),lp_supply:String(100n*U)},lp:'0',locked:'0',untilMs:0,balanceRtm:String(100n*U),balanceToken:String(100n*U),codeHash:'4'.repeat(64),readAt:Date.now()};
  const mocks={
+ './safehouse-refresh':{SafehouseRefresh:node('SafehouseRefresh')},
  'react':hooks,'react/jsx-runtime':{jsx,jsxs:jsx,Fragment:'Fragment'},'next/link':{__esModule:true,default:node('Link')},
  '../../components/preferences':ui,'../../components/copy-value':{CopyValue:node('CopyValue')},
  '../../components/shared-wallet':{useSharedWallet:()=>({account,ready:true}),WalletRequired:node('WalletRequired')},
@@ -71,3 +72,24 @@ console.log('PASS unknown Wallet outcome remains recoverable and cannot silently
 const d=harness('src/app/dex/page.tsx');await d.settle();await d.click('Select token');
 const pick=d.all().find(n=>n.type==='button'&&d.text(n).includes('NHT'));assert.ok(pick,'Token picker row');await pick.props.onClick();await d.settle();d.mode='read-error';await d.click('Review swap');assert.equal(d.button('Review swap').props.disabled,false);assert.equal(d.requested.length,0);assert.ok(!d.text(d.tree).includes('Telegram'));
 console.log('PASS actual DEX review failure releases its busy lock; no Telegram gate or signature required.');
+
+const {displayAmount,healthDisplay}=pure('src/app/lending/display.ts');
+assert.equal(displayAmount('1.72189699511395446'),'1.7218');
+assert.equal(displayAmount('0.000000000000000001'),'<0.0001');
+assert.equal(displayAmount('1000000000000000000000.99999'),'1000000000000000000000.9999');
+assert.equal(healthDisplay(String(U-1n),'1',true).tone,'risk');
+assert.equal(healthDisplay(String(U),'1',true).tone,'caution');
+assert.equal(healthDisplay(String(U*3n/2n),'1',true).tone,'healthy');
+assert.equal(healthDisplay(String(U*7n),'1',false).label,'Price expired');
+assert.equal(healthDisplay('none','0',true).label,'No debt');
+const precise=harness('src/app/lending/page.tsx');await precise.settle();
+await precise.input('lending-amount','1.72189699511395446');
+let amountInput=precise.all().find(n=>n.props?.id==='lending-amount');
+assert.equal(amountInput.props.value,'1.7218');
+amountInput.props.onFocus();await precise.settle();
+amountInput=precise.all().find(n=>n.props?.id==='lending-amount');
+assert.equal(amountInput.props.value,'1.72189699511395446');
+amountInput.props.onBlur();await precise.settle();
+await precise.click('Approve RTD');await precise.click('Confirm & sign');
+assert.equal(precise.requested[0].params.args[1],'1721896995113954460');
+console.log('PASS shortened display retains all 18 atomic decimals in the signed call; health risk boundaries and stale/no-debt labels checked.');

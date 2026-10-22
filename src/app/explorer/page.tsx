@@ -1,7 +1,7 @@
 "use client";
 import { CopyValue } from "../../components/copy-value";
 import { displayAction } from "../../lib/explorer/labels";
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { explorerLookup, type ExplorerResult } from "../../lib/explorer/browser";
 import { UiText, UiInput } from "../../components/preferences";
 import "./explorer.css";
@@ -26,7 +26,7 @@ export default function Explorer() {
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const lock = useRef(false);
-  async function lookup(query: string, offset = 0) {
+  const lookup = useCallback(async (query: string, offset = 0) => {
     if (lock.current) return;
     lock.current = true;
     setBusy(true);
@@ -42,7 +42,11 @@ export default function Explorer() {
       lock.current = false;
       setBusy(false);
     }
-  }
+  }, []);
+  useEffect(() => {
+    const txId = new URL(window.location.href).searchParams.get("tx");
+    if (txId && /^tx_[a-f0-9]{32}$/.test(txId)) void Promise.resolve().then(() => lookup(txId));
+  }, [lookup]);
   const tx = result?.kind === "transaction" ? result.record : null;
   return (
     <main className="explorer-page">
@@ -274,3 +278,4 @@ export default function Explorer() {
     </main>
   );
 }
+

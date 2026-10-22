@@ -1,3 +1,4 @@
+import { nativeBalance } from "./native";
 import type { LendingConfig } from "./config";
 export type Fields = Record<string, string>;
 const address = /^rete[0-9a-f]{68}$/;
@@ -119,6 +120,7 @@ export async function snapshot(c: LendingConfig, wallet: string) {
     position,
     nonce,
     balance: clean(balance),
+    rtmBalance: nativeBalance(account),
     allowance: clean(allowance),
     readAt: Date.now(),
   };

@@ -116,3 +116,89 @@
     margin-top: 18px;
   }
 }
+
+/* Scoped redesign: display only. Contract, shares and signature handlers are unchanged. */
+.lending-redesign { max-width:1080px; --lend-good:#36d989; --lend-amber:#e6ae4d; --lend-red:#f17479; }
+.lending-title-row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.lending-redesign .lending-badge { display:inline-flex; align-items:center; padding:4px 9px; border:1px solid var(--ui-line); border-radius:999px; font-size:12px; font-weight:600; background:color-mix(in srgb,var(--ui-accent) 10%,transparent); color:var(--ui-text); white-space:nowrap; }
+.lending-redesign .lending-grid { grid-template-columns:minmax(0,1.18fr) minmax(0,1fr); gap:20px; align-items:start; }
+.lending-redesign .lending-card { background:var(--ui-surface); border-color:var(--ui-line); padding:22px; min-width:0; }
+.lending-redesign h2 { font-size:19px; margin:0 0 20px; }
+.lending-redesign .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+.lending-redesign .lending-group-tabs { display:flex; gap:4px; padding:4px; border-radius:13px; width:fit-content; max-width:100%; background:var(--ui-input); }
+.lending-redesign .lending-group-tabs button { margin:0; border:0; font-weight:600; padding:11px 14px; }
+.lending-redesign .lending-group-tabs button.primary { background:var(--ui-accent); }
+.lending-redesign .lending-action-tabs { display:flex; gap:6px; flex-wrap:wrap; margin:15px 0; }
+.lending-redesign .lending-action-tabs button { border-radius:999px; margin:0; padding:8px 12px; font-size:13px; }
+.lending-redesign .lending-action-tabs button[aria-pressed="true"] { border-color:var(--ui-accent); background:color-mix(in srgb,var(--ui-accent) 10%,transparent); }
+.lending-redesign .lending-steps { display:flex; gap:8px; margin:18px 0; }
+.lending-redesign .step { display:flex; flex:1; align-items:center; gap:9px; min-width:0; padding:12px; border:1px solid var(--ui-line); border-radius:11px; }
+.lending-redesign .step > span { flex-shrink:0; width:22px; height:22px; display:grid; place-items:center; border-radius:50%; background:var(--ui-line); font-size:12px; font-weight:700; }
+.lending-redesign .step strong { display:block; font-size:13px; }
+.lending-redesign .step small { display:block; margin-top:5px; font-size:12px!important; line-height:1.4; color:var(--ui-muted); }
+.lending-redesign .step.complete { border-color:color-mix(in srgb,var(--lend-good) 50%,var(--ui-line)); background:color-mix(in srgb,var(--lend-good) 7%,transparent); }
+.lending-redesign .step.complete > span { color:var(--lend-good); background:transparent; }
+.lending-redesign .step.current { border-color:color-mix(in srgb,var(--ui-accent) 65%,var(--ui-line)); }
+.lending-redesign .step.current > span { background:var(--ui-accent); color:#16110e; }
+.lending-redesign .lending-amount-label { display:flex; justify-content:space-between; align-items:center; gap:12px; font-size:12px; margin:18px 0 8px; }
+.lending-redesign .lending-amount-label label { margin:0; font-weight:600; }
+.lending-redesign .lending-amount-label > span:last-child { text-align:right; color:var(--ui-muted); }
+.lending-redesign .lending-amount-box { position:relative; display:flex; align-items:center; }
+.lending-redesign .lending-amount-box input { font-size:25px!important; font-weight:650; font-variant-numeric:tabular-nums; min-height:66px; padding:16px 64px 16px 15px; text-overflow:ellipsis; }
+.lending-redesign .lending-amount-box > span { position:absolute; right:15px; color:var(--ui-muted); pointer-events:none; }
+.lending-redesign .lending-presets { display:flex; gap:8px; margin:10px 0; }
+.lending-redesign .lending-presets button { border-radius:999px; margin:0; padding:8px 13px; font-weight:600; background:var(--ui-input); }
+.lending-redesign .lending-presets button:hover:not(:disabled) { border-color:var(--ui-accent); }
+.lending-redesign .lending-review-summary { border-top:1px solid var(--ui-line); padding:16px 0; margin-top:18px; display:grid; gap:12px; }
+.lending-redesign .lending-review-summary > div { display:flex; justify-content:space-between; gap:12px; font-size:13px; }
+.lending-redesign .lending-review-summary > div > :first-child { color:var(--ui-muted); }
+.lending-redesign .lending-review-summary strong { font-variant-numeric:tabular-nums; }
+.lending-redesign .lending-cta-row { display:flex; gap:8px; }
+.lending-redesign .lending-cta-row button { margin:0; min-height:45px; }
+.lending-redesign .lending-cta-row .primary { flex:1; }
+.lending-redesign .lending-notice { padding:12px 14px; background:var(--ui-input); border:1px solid var(--ui-line); border-radius:11px; font-size:13px; }
+.lending-redesign .lending-inline-note { padding:10px 12px; border-radius:8px; background:color-mix(in srgb,var(--ui-accent) 8%,transparent); font-size:13px; }
+.lending-redesign .lending-sign-button { min-width:65%; min-height:44px; }
+.lending-redesign .lending-tx-panel { margin-top:16px; padding:16px; border:1px solid var(--ui-line); border-radius:13px; background:var(--ui-input); }
+.lending-redesign .lending-tx-panel.confirmed { border-color:color-mix(in srgb,var(--lend-good) 45%,var(--ui-line)); }
+.lending-redesign .lending-panel-heading { display:flex; justify-content:space-between; gap:12px; align-items:center; margin-bottom:14px; }
+.lending-redesign .lending-tx-progress { display:flex; gap:8px; flex-wrap:wrap; align-items:center; font-size:12px; color:var(--ui-muted); }
+.lending-redesign .lending-tx-progress .done { color:var(--lend-good); }
+.lending-redesign .lending-tx-progress .current { color:var(--lend-amber); }
+.lending-redesign .lending-tx-links { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+.lending-redesign a { color:var(--ui-accent); text-underline-offset:3px; }
+.lending-redesign .lending-health { padding-bottom:18px; border-bottom:1px solid var(--ui-line); }
+.lending-redesign .lending-health .lending-amount-label { margin-top:0; }
+.lending-redesign .lending-health-number { display:block; font-size:44px; line-height:1.2; margin:10px 0 14px; font-variant-numeric:tabular-nums; }
+.lending-redesign .lending-health.healthy .lending-health-number { color:var(--lend-good); }
+.lending-redesign .lending-health.caution .lending-health-number { color:var(--lend-amber); }
+.lending-redesign .lending-health.risk .lending-health-number { color:var(--lend-red); }
+.lending-redesign .lending-health-track { position:relative; height:8px; border-radius:10px; background:linear-gradient(90deg,var(--lend-red) 0%,var(--lend-red) 32%,var(--lend-amber) 34%,var(--lend-amber) 49%,var(--lend-good) 52%); }
+.lending-redesign .lending-health.neutral .lending-health-track { background:var(--ui-line); }
+.lending-redesign .lending-health-track > span { position:absolute; top:-4px; width:4px; height:16px; background:var(--ui-text); border-radius:3px; transform:translateX(-50%); }
+.lending-redesign .lending-health-scale { display:flex; justify-content:space-between; margin-top:10px; color:var(--ui-muted); font-size:12px; }
+.lending-redesign .lending-position-stats { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:22px 16px; padding:22px 0; border-bottom:1px solid var(--ui-line); }
+.lending-redesign .lending-position-stats > div > span { display:block; color:var(--ui-muted); font-size:12px; margin-bottom:7px; }
+.lending-redesign .lending-position-stats strong { font-size:21px; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+.lending-redesign .lending-position-stats small { font-size:12px!important; color:var(--ui-muted); font-weight:400; }
+.lending-redesign .lending-market-stats { font-size:13px; gap:14px 10px; margin:22px 0; }
+.lending-redesign .lending-status-dot { display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; background:var(--lend-amber); }
+.lending-redesign .lending-status-dot.ok { background:var(--lend-good); }
+.lending-redesign details { font-size:13px; margin-top:14px; overflow-wrap:anywhere; }
+.lending-redesign summary { color:var(--ui-accent); cursor:pointer; }
+html[data-theme="light"] .lending-redesign { --lend-good:#167c46; --lend-amber:#976008; --lend-red:#bd2639; }
+@media(max-width:760px) { .lending-redesign .lending-grid { grid-template-columns:1fr; } .lending-redesign .lending-card { padding:18px; } }
+@media(max-width:420px) { .lending-redesign .lending-steps { flex-direction:column; } .lending-redesign .lending-amount-label { align-items:flex-start; } .lending-redesign .lending-amount-label > span:last-child { max-width:65%; } .lending-redesign .lending-group-tabs { width:100%; } .lending-redesign .lending-group-tabs button { flex:1; padding:10px 9px; } }
+
+/* Compact no-debt state and amount font override for shared global input styles. */
+.lending-redesign .lending-health-empty { padding-bottom:14px; }
+.lending-redesign .lending-health-empty .lending-amount-label { margin-bottom:6px; }
+.lending-redesign .lending-health-empty p { margin:6px 0 0; }
+.lending-redesign input#lending-amount { font-size:28px!important; font-weight:650; line-height:1.2; min-height:66px; }
+.lending-redesign input#lending-amount::placeholder { font-size:28px; font-weight:500; }
+@media(max-width:420px) { .lending-redesign input#lending-amount { font-size:24px!important; } }
+
+.safehouse-manual{margin-top:16px;padding:18px;overflow-wrap:anywhere}
+.safehouse-manual p{font-size:13px;line-height:1.5;margin:10px 0}
+.safehouse-manual button{margin:4px 8px 4px 0}
+.safehouse-manual input{display:block;width:100%;margin:8px 0;font-size:13px}
