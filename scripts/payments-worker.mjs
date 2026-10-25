@@ -81,6 +81,12 @@ async function main() {
         state.pendingNotices = result.pendingNotices ?? 0;
         state.dexPending = result.dexPending ?? 0;
         state.dexPendingNotices = result.dexPendingNotices ?? 0;
+        // Keep active jobs responsive; idle queues need fewer database round trips.
+        // needsReview still polls at 15s so recoverable work is not delayed.
+        if (!result.rpcError && !state.pending && !state.needsReview &&
+            !state.pendingNotices && !state.dexPending && !state.dexPendingNotices) {
+          delay = 45_000;
+        }
         const summary = `Pending TX: ${state.pending}; needs review: ${state.needsReview}; pending confirmations: ${state.pendingNotices}; DEX pending: ${state.dexPending}; DEX notices: ${state.dexPendingNotices}.`;
         if (summary !== lastSummary || result.checked) { log(summary); lastSummary = summary; }
         if (result.rpcError) log("RPC check failed. Retrying later without confirming or resending payment.");

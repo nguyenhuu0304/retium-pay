@@ -2,7 +2,7 @@
 // DATABASE_URL enables PostgreSQL. Vercel never falls back to ephemeral files.
 import { mkdir, readFile, writeFile, rename, rmdir } from 'node:fs/promises';
 import path from 'node:path';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHash } from 'node:crypto';
 import pg from 'pg';
 import { AsyncLocalStorage } from 'node:async_hooks';
 const activeClient = new AsyncLocalStorage();
@@ -14,6 +14,20 @@ export const dataNames = Object.freeze([
 ]);
 const slot = Symbol.for('retium-pay.postgres.v1');
 const context = globalThis;
+// Process-local payload cache. Every read still validates against PostgreSQL;
+// never use a time-based stale cache for payment state or authorization.
+const documents = new Map();
+const digest = text => createHash('md5').update(text, 'utf8').digest('hex');
+async function readDocument(client, name, cached = documents.get(name)) {
+  const result = await client.query(`SELECT md5(content) AS version,
+    CASE WHEN md5(content) = $2 THEN NULL ELSE content END AS content
+    FROM retium_pay_documents WHERE name = $1`, [name, cached?.version ?? null]);
+  if (!result.rows.length) return null;
+  const row = result.rows[0];
+  const content = row.content === null ? cached?.content : row.content;
+  if (typeof content !== 'string') throw Error('Invalid document cache response.');
+  return {version: row.version, content};
+}
 function nameOf(file) {
   const name = path.basename(file);
   if (!dataNames.includes(name)) throw Error('Unknown application data document.');
@@ -68,9 +82,12 @@ export async function readData(file, encoding = 'utf8') {
   const name = nameOf(file);
   if (!databaseEnabled()) return readFile(file, { encoding: /** @type {'utf8'} */ (encoding) });
   const client = activeClient.getStore() || await database();
-  const result = await client.query('SELECT content FROM retium_pay_documents WHERE name = $1', [name]);
-  if (!result.rows.length) throw missing();
-  return result.rows[0].content;
+  // Transactional reads must not publish uncommitted state into the shared cache.
+  const transactional = Boolean(activeClient.getStore());
+  const row = await readDocument(client, name, transactional ? null : documents.get(name));
+  if (!row) { if (!transactional) documents.delete(name); throw missing(); }
+  if (!transactional) documents.set(name, row);
+  return row.content;
 }
 /**
  * One transaction/client for read-modify-write; the per-document advisory lock also
@@ -92,12 +109,17 @@ export async function withDocument(file, initial, action) {
       await client.query("SET LOCAL lock_timeout = '15s'");
       await client.query("SET LOCAL statement_timeout = '20s'");
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', ['retium-pay:' + name]);
-      const result = await client.query('SELECT content FROM retium_pay_documents WHERE name=$1', [name]);
-      const state = result.rows.length ? decode(name, result.rows[0].content) : initial();
+      const row = await readDocument(client, name);
+      const state = row ? decode(name, row.content) : initial();
       const output = await activeClient.run(client, () => action(state));
-      await client.query(`INSERT INTO retium_pay_documents(name,content) VALUES($1,$2)
-        ON CONFLICT(name) DO UPDATE SET content=excluded.content,updated_at=now()`, [name, encode(name, state)]);
+      const content = encode(name, state);
+      if (!row || content !== row.content) {
+        await client.query(`INSERT INTO retium_pay_documents(name,content) VALUES($1,$2)
+          ON CONFLICT(name) DO UPDATE SET content=excluded.content,updated_at=now()`, [name, content]);
+      }
       await client.query('COMMIT');
+      // Only committed content is reusable. A rollback leaves the old cache valid.
+      documents.set(name, {version: digest(content), content});
       return output;
     } catch (error) {
       await client.query('ROLLBACK').catch(() => {});
@@ -141,6 +163,7 @@ export async function stableSecret(file) {
   return row.secret;
 }
 export async function closeStorage() {
+  documents.clear();
   const holder = context[slot];
   if(holder) { delete context[slot]; await holder.pool.end(); }
 }
