@@ -76,9 +76,12 @@ export async function checkNodeHealth(): Promise<NodeHealth> {
       peers: readNumber(value.peers),
       chainId,
       protocolVersion,
-      chainIdVerified: config.chainId !== null && chainId === config.chainId,
+      // The documented public /health response currently exposes only
+      // status, tick, peers and node version. Treat identity fields as
+      // verified only if the node actually returns them.
+      chainIdVerified: chainId !== null && config.chainId !== null && chainId === config.chainId,
       protocolVersionVerified:
-        config.protocolVersion !== null && protocolVersion === config.protocolVersion,
+        protocolVersion !== null && config.protocolVersion !== null && protocolVersion === config.protocolVersion,
       ...(!reachable ? { error: "Node health endpoint returned an unexpected response." } : {}),
     };
   } catch (error) {
@@ -132,6 +135,10 @@ export async function assertFeatureReady(feature: "dex" | "lending"): Promise<vo
   const config = getRetiumNetworkConfig();
   const node = await checkNodeHealth();
   if (!node.reachable) throw new Error("Retium node health check failed. On-chain actions are temporarily disabled.");
+  if (node.chainId !== null && !node.chainIdVerified)
+    throw new Error("Retium chain ID does not match the configured network. On-chain actions are disabled.");
+  if (node.protocolVersion !== null && !node.protocolVersionVerified)
+    throw new Error("Retium protocol version does not match the configured version. On-chain actions are disabled.");
   if (feature === "dex") {
     if (!config.dex.enabled || config.dex.contract.source !== "environment") {
       throw new Error("DEX is disabled until a new contract ID, expected code hash and RETIUM_DEX_ENABLED=true are configured.");
