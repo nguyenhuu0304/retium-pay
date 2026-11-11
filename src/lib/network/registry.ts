@@ -107,7 +107,7 @@ export function getRetiumNetworkConfig(
     rpcUrl,
     // Retium testnet wire reference currently documents chain ID 3 / payload v6.
     // Environment overrides allow a future network upgrade without code edits.
-    chainId: readInteger(env.RETIUM_CHAIN_ID || "3"),
+    chainId: readInteger(env.NEXT_PUBLIC_RETIUM_CHAIN_ID || env.RETIUM_CHAIN_ID || "3"),
     protocolVersion: readInteger(env.RETIUM_PROTOCOL_VERSION || "6"),
     dex: {
       enabled:
