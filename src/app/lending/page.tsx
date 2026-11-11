@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSharedWallet } from "../../components/shared-wallet";
 import { walletRequest } from "../../lib/wallet/adapter";
+import { RETIUM_CHAIN_ID } from "../../lib/network/public-config";
 import { UiText } from "../../components/preferences";
 import { CopyValue } from "../../components/copy-value";
 import type { LendingConfig } from "../../lib/lending/config";
@@ -166,7 +167,7 @@ export default function Lending() {
     setLastTx("");
     try {
       // Reuse the wallet selected on Dashboard. Review performs reads, never a signature.
-      if (Number(account?.chainId) !== 3)
+      if (Number(account?.chainId) !== RETIUM_CHAIN_ID)
         throw Error("Select the Retium test network on Dashboard.");
       const fresh = await snapshot(config, wallet);
       if (activeWallet.current !== wallet) throw Error("Wallet changed. Start again with the selected wallet.");
@@ -663,7 +664,7 @@ function PriceAdmin({ config, wallet, chain, disabled, onBlocked, onFresh }: {
   }, [key, wallet, config.market, onBlocked]);
   useEffect(() => { onBlocked(busy || !!saved); }, [busy, saved, onBlocked]);
   async function prepare() {
-    if (disabled || lock.current || saved || chain !== 3) return;
+    if (disabled || lock.current || saved || chain !== RETIUM_CHAIN_ID) return;
     lock.current = true; setBusy(true); setReady(null);
     try {
       const fresh = await snapshot(config, wallet);
