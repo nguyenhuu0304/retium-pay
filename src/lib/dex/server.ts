@@ -1,4 +1,5 @@
 import { verifyDexTx } from "../transactions/verify";
+import { rpcGet } from "../rpc/client";
 export { verifyDexTx } from "../transactions/verify";
 import { readPool } from "./pool-read";
 import { parseReviewSnapshot, parseDeploymentAccount } from "./review-input";
@@ -21,19 +22,8 @@ import {
   type Pool,
 } from "./math";
 const directory = path.join(process.cwd(), "data");
-const rpc = (process.env.RETIUM_RPC_URL || "https://rpc.retium.org").replace(
-  /\/$/,
-  "",
-);
 export async function rpcRead(endpoint: string) {
-  const response = await fetch(`${rpc}/api/${endpoint}`, {
-    cache: "no-store",
-    signal: AbortSignal.timeout(12_000),
-  });
-  const data = await response.json();
-  if (!response.ok)
-    throw Error(`RPC unavailable (${response.status}). Try again later.`);
-  return data;
+  return rpcGet(endpoint);
 }
 async function query(contract: string, method: string, args: string[] = []) {
   // The current node treats commas as argument separators before URL decoding.
