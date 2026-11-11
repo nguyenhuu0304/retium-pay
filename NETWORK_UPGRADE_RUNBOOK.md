@@ -5,7 +5,7 @@ an ordinary frontend deployment.
 
 ## Single source of truth
 
-Network settings are read by `src/lib/network/registry.ts`. Application code
+The browser-safe expected chain ID is read by `src/lib/network/public-config.ts`; set `NEXT_PUBLIC_RETIUM_CHAIN_ID` once for the deployment. The server registry reads the same public value. Network settings are read by `src/lib/network/registry.ts`. Application code
 must not hardcode RPC URLs, chain IDs, protocol versions, or contract IDs in
 feature modules.
 
@@ -15,7 +15,7 @@ Configure these Vercel environment variables for the target environment:
 | --- | --- |
 | `RETIUM_NETWORK_NAME` | Human-readable network name |
 | `RETIUM_RPC_URL` | HTTPS RPC origin, e.g. `https://rpc.retium.org` |
-| `RETIUM_CHAIN_ID` | Expected chain ID |
+| `NEXT_PUBLIC_RETIUM_CHAIN_ID` | Expected chain ID shared by browser wallet checks and server diagnostics |
 | `RETIUM_PROTOCOL_VERSION` | Expected transaction payload version |
 | `RETIUM_DEX_ENABLED` | Set to `true` only after DEX verification |
 | `NEXT_PUBLIC_RETIUM_DEX_CONTRACT_ID` | Newly deployed DEX contract ID (public identifier, never a secret) |
