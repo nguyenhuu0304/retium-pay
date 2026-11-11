@@ -45,7 +45,7 @@ export async function GET(request: Request) {
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "DEX read failed." },
-      { status: 400 },
+      { status: /health check|disabled|verification|code hash|network/i.test(e instanceof Error ? e.message : "") ? 503 : 400 },
     );
   }
 }
