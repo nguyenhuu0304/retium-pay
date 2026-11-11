@@ -145,11 +145,18 @@ export async function issueTrackingTicket(plan: Plan) {
   return `${payload}.${createHmac("sha256", await key()).update(payload).digest("hex")}`;
 }
 export async function prepare(body: Record<string, unknown>) {
-  if (
-    process.env.NEXT_PUBLIC_RETIUM_DEX_CONTRACT_ID &&
-    !getRetiumNetworkConfig().dex.enabled
-  ) {
-    throw Error("DEX is disabled until the configured contract ID and code hash are verified and RETIUM_DEX_ENABLED=true.");
+  if (process.env.NEXT_PUBLIC_RETIUM_DEX_CONTRACT_ID) {
+    const network = getRetiumNetworkConfig();
+    if (!network.dex.enabled || !network.dex.contract.codeHash) {
+      throw Error("DEX is disabled until its contract ID, expected code hash and RETIUM_DEX_ENABLED=true are configured.");
+    }
+    const liveContract = await rpcRead(`contract/${DEX}`);
+    if (
+      liveContract.contract_id !== DEX ||
+      liveContract.code_hash !== network.dex.contract.codeHash
+    ) {
+      throw Error("Configured DEX contract code hash does not match the active Retium network. Transaction preview is blocked.");
+    }
   }
   const token = String(body.token || ""),
     wallet = String(body.wallet || "");
