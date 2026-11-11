@@ -6,6 +6,7 @@ import {
 } from "../../components/member-identity";
 import { CopyValue } from "../../components/copy-value";
 import { UiText, UiInput } from "../../components/preferences";
+import { walletRequest } from "../../lib/wallet/adapter";
 
 import {
   useSharedWallet,
@@ -39,15 +40,6 @@ type AuthResult = {
   signature: string;
   message: string;
 };
-type Provider = {
-  request(input: {
-    method: string;
-    params?: Record<string, unknown>;
-  }): Promise<unknown>;
-};
-function provider() {
-  return (window as unknown as { retium?: Provider }).retium;
-}
 function errorCode(error: unknown) {
   return typeof error === "object" && error !== null && "code" in error
     ? String(error.code)
@@ -217,13 +209,9 @@ export default function PaymentsPage() {
     }
   }
   async function create() {
-    const wallet = provider();
-    if (!wallet || !challenge || !begin()) return;
+    if (!challenge || !begin()) return;
     try {
-      const result = (await wallet.request({
-        method: "retium_signAuth",
-        params: challenge,
-      })) as AuthResult;
+      const result = await walletRequest<AuthResult>("retium_signAuth", challenge);
       if (result.address !== address)
         throw Error("The signing account differs from the Dashboard wallet.");
       const data = await api({ action: "create", ...result });
@@ -267,13 +255,9 @@ export default function PaymentsPage() {
     }
   }
   async function authorizePay() {
-    const wallet = provider();
-    if (!wallet || !payChallenge || !payment || !begin()) return;
+    if (!payChallenge || !payment || !begin()) return;
     try {
-      const result = (await wallet.request({
-        method: "retium_signAuth",
-        params: payChallenge,
-      })) as AuthResult;
+      const result = await walletRequest<AuthResult>("retium_signAuth", payChallenge);
       const data = await api({
         action: "authorizePay",
         id: payment.id,
@@ -295,19 +279,15 @@ export default function PaymentsPage() {
     }
   }
   async function send() {
-    const wallet = provider();
-    if (!wallet || !payment || !sendAllowed.current || !begin()) return;
+    if (!payment || !sendAllowed.current || !begin()) return;
     sendAllowed.current = false;
     setReadyToSend(false);
     try {
       // No network request or timeout before the Wallet popup opens.
-      const result = (await wallet.request({
-        method: "retium_sendTransfer",
-        params: {
-          to: payment.recipient,
-          amountAtomic: payment.amountAtomic,
-        },
-      })) as { txId?: string };
+      const result = await walletRequest<{ txId?: string }>("retium_sendTransfer", {
+        to: payment.recipient,
+        amountAtomic: payment.amountAtomic,
+      });
       if (!result.txId || !/^tx_[0-9a-f]{32}$/.test(result.txId))
         throw new Error(
           "Wallet returned no valid TX ID. Check Wallet history; do not send again.",
