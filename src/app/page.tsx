@@ -95,7 +95,7 @@ export default function Home() {
         </Link>
       </section>
       <section className="dashboard-tools" aria-label="Available tools">
-        {[...tools].filter((item) => item.href !== "/telegram").sort((a, b) => ["/payments", "/split", "/requests", "/dex", "/deploy", "/explorer", "/lending", "/network"].indexOf(a.href) - ["/payments", "/split", "/requests", "/dex", "/deploy", "/explorer", "/lending"].indexOf(b.href)).map((item) => (
+        {[...tools].filter((item) => item.href !== "/telegram").sort((a, b) => ["/payments", "/split", "/requests", "/dex", "/deploy", "/explorer", "/lending", "/network"].indexOf(a.href) - ["/payments", "/split", "/requests", "/dex", "/deploy", "/explorer", "/lending", "/network"].indexOf(b.href)).map((item) => (
           <article className="dashboard-tool" key={item.href}>
             <h2>{<UiText text={item.title} />}</h2>
             <p>{<UiText text={item.text} />}</p>
