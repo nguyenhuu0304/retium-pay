@@ -2,7 +2,7 @@
 import { CopyValue } from "./copy-value";
 import { UiText } from "./preferences";
 import { parseRememberedWallet } from "../lib/ui/remembered-wallet";
-import { walletRequest } from "../lib/wallet/adapter";
+import { walletRequest, RETIUM_WALLET_SDK } from "../lib/wallet/adapter";
 
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import Script from "next/script";
@@ -140,8 +140,8 @@ export function SharedWalletProvider({
       value={{ account, ready, busy, notice, remembered, connect, disconnect }}
     >
       <Script
-        src="https://wallet.retium.org/connect/sdk/retium-sdk-1.3.0.js"
-        integrity="sha384-FTG6s31+cSLKvZXfREum814s/L2AnqVyikuFQvMKIvFfAz40ksTcaXVbRmkHGGTU"
+        src={RETIUM_WALLET_SDK.src}
+        integrity={RETIUM_WALLET_SDK.integrity}
         crossOrigin="anonymous"
         strategy="afterInteractive"
         onError={() =>
