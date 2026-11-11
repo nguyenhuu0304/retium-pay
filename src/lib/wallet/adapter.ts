@@ -7,6 +7,11 @@
  * not blocked by an intervening network await.
  */
 
+export const RETIUM_WALLET_SDK = {
+  src: "https://wallet.retium.org/connect/sdk/retium-sdk-1.3.0.js",
+  integrity: "sha384-FTG6s31+cSLKvZXfREum814s/L2AnqVyikuFQvMKIvFfAz40ksTcaXVbRmkHGGTU",
+} as const;
+
 export type RetiumWalletMethod =
   | "retium_requestAccounts"
   | "retium_signAuth"
