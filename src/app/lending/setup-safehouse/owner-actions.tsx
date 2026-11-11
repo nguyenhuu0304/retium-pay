@@ -22,7 +22,7 @@ export function SafehouseOwnerActions({market,wallet,chain,onMarketState}:{marke
     if(c.code_hash!==SETUP_HASH||c.deployer!==SETUP_OWNER||a.code_hash!==SETUP_ASSET_HASH||m.owner!==SETUP_OWNER||m.version!=="v0.2.0"||m.oracle_mode!=="safehouse_reference_feed"||m.asset!==SETUP_ASSET||m.asset_hash!==SETUP_ASSET_HASH)throw Error("Market, asset or owner mismatch. Stop setup.");
     setStatus(m);onMarketState?.(m.paused === "0");return m;
   }
-  function requireOwner(){if(current.current.wallet!==SETUP_OWNER||current.current.chain!==3)throw Error("Select wallet cb37 on testnet chain 3.");}
+  function requireOwner(){if(current.current.wallet!==SETUP_OWNER||current.current.chain!==RETIUM_CHAIN_ID)throw Error("Select wallet cb37 on the configured Retium testnet.");}
   async function prepare(method:Action){
     if(lock.current||pending||!loaded)return;lock.current=true;setBusy(true);setPrepared(null);
     try{
@@ -77,7 +77,7 @@ export function SafehouseOwnerActions({market,wallet,chain,onMarketState}:{marke
       persist(null);setRecovery("");setNotice(`${pending.method}: HardFinal, execution OK. Chỉ bước này đã hoàn tất.`);
     }catch(e){setNotice(errorText(e));}finally{lock.current=false;setBusy(false);}
   }
-  const blocked=busy||!!pending||!loaded||wallet!==SETUP_OWNER||chain!==3;
+  const blocked=busy||!!pending||!loaded||wallet!==SETUP_OWNER||chain!==RETIUM_CHAIN_ID;
   return <section className="lending-card"><h2>3. Kiểm tra RTD và cấp quyền cập nhật giá</h2>
     <p>Publisher được chỉ định (ví đã nạp 3 RTM test):</p><CopyValue value={ORACLE}/>
     <p>Approve chỉ cấp quyền 0.001 RTD. Probe chuyển 0.001 RTD vào và trả lại trong cùng giao dịch. Mỗi bước ký riêng, có phí RTM test.</p>
