@@ -95,7 +95,7 @@ export function getRetiumNetworkConfig(
   );
 
   const dex = readContract(
-    env.NEXT_PUBLIC_RETIUM_DEX_CONTRACT_ID || env.RETIUM_DEX_CONTRACT_ID,
+    env.NEXT_PUBLIC_RETIUM_DEX_CONTRACT_ID,
     env.RETIUM_DEX_CODE_HASH,
     // Kept only to preserve old read-only references during migration.
     // It is never considered verified and must not authorize transactions.
