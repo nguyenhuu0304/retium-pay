@@ -3,6 +3,7 @@ import { CopyValue } from "./copy-value";
 import { UiText } from "./preferences";
 import { parseRememberedWallet } from "../lib/ui/remembered-wallet";
 import { walletRequest, RETIUM_WALLET_SDK } from "../lib/wallet/adapter";
+import { RETIUM_CHAIN_ID } from "../lib/network/public-config";
 
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import Script from "next/script";
@@ -86,11 +87,11 @@ export function SharedWalletProvider({
       if (
         !a ||
         !/^rete[0-9a-f]{68}$/.test(a.address) ||
-        Number(a.chainId) !== 3
+        Number(a.chainId) !== RETIUM_CHAIN_ID
       )
-        throw Error("Select the Retium test network (chain 3).");
+        throw Error(`Select the configured Retium test network (chain ${RETIUM_CHAIN_ID}).`);
       if (account && account.address !== a.address) await logout();
-      const next = { address: a.address, chainId: 3 };
+      const next = { address: a.address, chainId: RETIUM_CHAIN_ID };
       setAccount(next);
       setRemembered(false);
       try {
