@@ -127,7 +127,7 @@ export default function NetworkPage() {
               <article className="network-feature" key={name}>
                 <div className="network-card-heading">
                   <h3>{name === "dex" ? "DEX" : name === "lending" ? "Lending" : "Payments & history"}</h3>
-                  {feature?.ready === null ? <span className="network-status">Independent</span> : feature ? <Status ok={feature.ready} /> : <span className="network-status">Not checked</span>}
+                  {!feature ? <span className="network-status">Not checked</span> : feature.ready === null ? <span className="network-status">Independent</span> : <Status ok={feature.ready} />}
                 </div>
                 <p>{feature?.reason || feature?.note || (name === "payments" ? "Independent from DEX and Lending contract status." : "Requires verified contracts on the active network.")}</p>
               </article>
