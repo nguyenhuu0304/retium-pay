@@ -11,7 +11,7 @@ export async function readPublic(path: string) {
     throw Error("Unsupported lending read.");
   }
   const response = await fetch(
-    \`/api/network/read?path=\${encodeURIComponent(safePath)}\`,
+    "/api/network/read?path=" + encodeURIComponent(safePath),
     {
       method: "GET",
       cache: "no-store",
@@ -25,7 +25,7 @@ export async function readPublic(path: string) {
   if (raw.length > 100000) throw Error("Response too large.");
   const value = JSON.parse(raw);
   if (!response.ok)
-    throw Error(typeof value?.error === "string" ? value.error : \`Retium API returned HTTP \${response.status}.\`);
+    throw Error(typeof value?.error === "string" ? value.error : "Retium API returned HTTP " + response.status + ".");
   if (!value || typeof value !== "object") throw Error("Invalid API response.");
   return value;
 }
