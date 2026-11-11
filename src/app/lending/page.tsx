@@ -320,7 +320,7 @@ export default function Lending() {
     setPreview(null);
     let hold: Pending | null = null;
     try {
-      if (ready.plan.wallet !== wallet || Number(account?.chainId) !== 3)
+      if (ready.plan.wallet !== wallet || Number(account?.chainId) !== RETIUM_CHAIN_ID)
         throw Error(
           "Preview belongs to a different wallet or network. Review again.",
         );
@@ -682,7 +682,7 @@ function PriceAdmin({ config, wallet, chain, disabled, onBlocked, onFresh }: {
     lock.current = true; setBusy(true);
     let hold: PriceTx | null = null;
     try {
-      if (chain !== 3 || wallet !== PRICE_OWNER) throw Error("Owner wallet on Retium testnet required.");
+      if (chain !== RETIUM_CHAIN_ID || wallet !== PRICE_OWNER) throw Error("Owner wallet on the configured Retium testnet required.");
       hold = { wallet, market: config.market, nonce: ready.nonce, txId: "" };
       localStorage.setItem(key, JSON.stringify(hold)); setSaved(hold); setReady(null);
       // Open the popup in this click gesture, before any await.
