@@ -4,6 +4,8 @@ import { saveReceipt, syncHistory } from "../../lib/transactions/history";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSharedWallet } from "../../components/shared-wallet";
+import { walletRequest } from "../../lib/wallet/adapter";
+import { RETIUM_CHAIN_ID } from "../../lib/network/public-config";
 import { UiText } from "../../components/preferences";
 import { CopyValue } from "../../components/copy-value";
 import type { LendingConfig } from "../../lib/lending/config";
@@ -164,9 +166,8 @@ export default function Lending() {
     setPreview(null);
     setLastTx("");
     try {
-      if (!window.retium) throw Error("Wallet SDK is not ready.");
       // Reuse the wallet selected on Dashboard. Review performs reads, never a signature.
-      if (Number(account?.chainId) !== 3)
+      if (Number(account?.chainId) !== RETIUM_CHAIN_ID)
         throw Error("Select the Retium test network on Dashboard.");
       const fresh = await snapshot(config, wallet);
       if (activeWallet.current !== wallet) throw Error("Wallet changed. Start again with the selected wallet.");
@@ -319,8 +320,7 @@ export default function Lending() {
     setPreview(null);
     let hold: Pending | null = null;
     try {
-      if (!window.retium) throw Error("Wallet unavailable.");
-      if (ready.plan.wallet !== wallet || Number(account?.chainId) !== 3)
+      if (ready.plan.wallet !== wallet || Number(account?.chainId) !== RETIUM_CHAIN_ID)
         throw Error(
           "Preview belongs to a different wallet or network. Review again.",
         );
@@ -335,10 +335,10 @@ export default function Lending() {
       localStorage.setItem(recovery, JSON.stringify(hold));
       setPending(hold);
       // No await before this request. SDK opens the transaction popup in this click gesture.
-      const result = (await window.retium.request({
-        method: "retium_call",
-        params: { ...ready.plan.call },
-      })) as { txId?: string };
+      const result = await walletRequest<{ txId?: string }>(
+        "retium_call",
+        { ...ready.plan.call },
+      );
       if (!result || !/^tx_[0-9a-f]{32}$/.test(result.txId || ""))
         throw Error(
           "Wallet returned no usable TX ID. Check wallet history before another action.",
@@ -664,7 +664,7 @@ function PriceAdmin({ config, wallet, chain, disabled, onBlocked, onFresh }: {
   }, [key, wallet, config.market, onBlocked]);
   useEffect(() => { onBlocked(busy || !!saved); }, [busy, saved, onBlocked]);
   async function prepare() {
-    if (disabled || lock.current || saved || chain !== 3) return;
+    if (disabled || lock.current || saved || chain !== RETIUM_CHAIN_ID) return;
     lock.current = true; setBusy(true); setReady(null);
     try {
       const fresh = await snapshot(config, wallet);
@@ -682,13 +682,13 @@ function PriceAdmin({ config, wallet, chain, disabled, onBlocked, onFresh }: {
     lock.current = true; setBusy(true);
     let hold: PriceTx | null = null;
     try {
-      if (chain !== 3 || wallet !== PRICE_OWNER || !window.retium) throw Error("Owner wallet on Retium testnet required.");
+      if (chain !== RETIUM_CHAIN_ID || wallet !== PRICE_OWNER) throw Error("Owner wallet on the configured Retium testnet required.");
       hold = { wallet, market: config.market, nonce: ready.nonce, txId: "" };
       localStorage.setItem(key, JSON.stringify(hold)); setSaved(hold); setReady(null);
       // Open the popup in this click gesture, before any await.
-      const result = await window.retium.request({ method: "retium_call", params: {
+      const result = await walletRequest<{ txId?: string }>("retium_call", {
         contractId: config.market, method: "set_price", args: ["1000000000000000000"], amountAtomic: "0"
-      } }) as { txId?: string };
+      });
       if (!/^tx_[0-9a-f]{32}$/.test(result?.txId || "")) throw Error("No usable TX ID. Check wallet history before signing again.");
       hold = { ...hold, txId: result.txId! }; localStorage.setItem(key, JSON.stringify(hold));
       if (live.current) { setSaved(hold); setMessage("Price update submitted. Checking execution automatically…"); }

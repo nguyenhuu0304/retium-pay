@@ -11,6 +11,7 @@ import {
   tokenPage,
   marketSummary,
 } from "../../../lib/dex/server";
+import { assertFeatureReady } from "../../../lib/network/health";
 export async function GET(request: Request) {
   try {
     const u = new URL(request.url);
@@ -19,7 +20,8 @@ export async function GET(request: Request) {
         await stakeSummary(u.searchParams.get("wallet") || ""),
         { headers: { "Cache-Control": "no-store" } },
       );
-    if (u.searchParams.get("view") === "tokens")
+    if (u.searchParams.get("view") === "tokens") {
+      await assertFeatureReady("dex");
       return NextResponse.json(
         await tokenPage(
           u.searchParams.get("cursor") || "0",
@@ -27,7 +29,9 @@ export async function GET(request: Request) {
         ),
         { headers: { "Cache-Control": "no-store" } },
       );
-    if (u.searchParams.get("view") === "market")
+    }
+    if (u.searchParams.get("view") === "market") {
+      await assertFeatureReady("dex");
       return NextResponse.json(
         await marketSummary(
           u.searchParams.get("token") || "",
@@ -35,13 +39,15 @@ export async function GET(request: Request) {
         ),
         { headers: { "Cache-Control": "no-store" } },
       );
+    }
+    await assertFeatureReady("dex");
     return NextResponse.json(await pools(u.searchParams.get("cursor") || "0"), {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "DEX read failed." },
-      { status: 400 },
+      { status: /health check|disabled|verification|code hash|network/i.test(e instanceof Error ? e.message : "") ? 503 : 400 },
     );
   }
 }
@@ -87,7 +93,7 @@ export async function POST(request: Request) {
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "DEX request failed." },
-      { status: 400 },
+      { status: /health check|disabled|verification|code hash|network/i.test(e instanceof Error ? e.message : "") ? 503 : 400 },
     );
   }
 }

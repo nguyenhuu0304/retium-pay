@@ -11,6 +11,7 @@ import {
 } from "../../components/shared-wallet";
 import { useEffect, useRef, useState } from "react";
 import type { Plan } from "../../lib/dex/math";
+import { walletRequest } from "../../lib/wallet/adapter";
 import "../tools.css";
 type Preview = { plan: Plan; ticket: string; wasmBase64: string };
 type Saved = {
@@ -159,7 +160,7 @@ export default function Deploy() {
   }
   function deploy() {
     void action(async () => {
-      if (!preview || !agreed || !window.retium || saved)
+      if (!preview || !agreed || saved)
         throw Error("Review the token first.");
       if (Date.now() > preview.plan.expiresAt)
         throw Error("Preview expired. Review again.");
@@ -174,13 +175,13 @@ export default function Deploy() {
       setJob(null);
       setPreview(null);
       try {
-        const result = (await window.retium.request({
-          method: "retium_deploy",
-          params: {
+        const result = await walletRequest<{ txId: string; contractId: string }>(
+          "retium_deploy",
+          {
             wasmBase64: preview.wasmBase64,
             metadata: preview.plan.deployment!.metadata,
           },
-        })) as { txId: string; contractId: string };
+        );
         if (!/^tx_[0-9a-f]{32}$/.test(result.txId))
           throw Error(
             "Wallet did not return a valid TX ID. Check its history.",

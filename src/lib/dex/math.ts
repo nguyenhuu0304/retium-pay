@@ -1,4 +1,5 @@
 export const DEX =
+  process.env.NEXT_PUBLIC_RETIUM_DEX_CONTRACT_ID ||
   "a8a370858f29a78c07dd115a7ef123d93e1e3ef1caa3bb7c27565c8ffb14945c";
 export const UNIT = 10n ** 18n;
 export type Pool = {

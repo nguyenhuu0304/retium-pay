@@ -2,6 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import { CopyValue } from "../../../components/copy-value";
 import { readPublic } from "../../../lib/lending/browser";
+import { walletRequest } from "../../../lib/wallet/adapter";
+import { RETIUM_CHAIN_ID } from "../../../lib/network/public-config";
 import { SETUP_OWNER, SETUP_HASH, SETUP_ASSET, SETUP_ASSET_HASH } from "../../../lib/lending/setup-safehouse";
 const ORACLE = "rete5562395fa3d8f4713742d55de025e43ed6e34628ef3657e39033b069808527229e82";
 const PROBE = "1000000000000000";
@@ -22,7 +24,7 @@ export function SafehouseOwnerActions({market,wallet,chain,onMarketState}:{marke
     if(c.code_hash!==SETUP_HASH||c.deployer!==SETUP_OWNER||a.code_hash!==SETUP_ASSET_HASH||m.owner!==SETUP_OWNER||m.version!=="v0.2.0"||m.oracle_mode!=="safehouse_reference_feed"||m.asset!==SETUP_ASSET||m.asset_hash!==SETUP_ASSET_HASH)throw Error("Market, asset or owner mismatch. Stop setup.");
     setStatus(m);onMarketState?.(m.paused === "0");return m;
   }
-  function requireOwner(){if(current.current.wallet!==SETUP_OWNER||current.current.chain!==3)throw Error("Select wallet cb37 on testnet chain 3.");}
+  function requireOwner(){if(current.current.wallet!==SETUP_OWNER||current.current.chain!==RETIUM_CHAIN_ID)throw Error("Select wallet cb37 on the configured Retium testnet.");}
   async function prepare(method:Action){
     if(lock.current||pending||!loaded)return;lock.current=true;setBusy(true);setPrepared(null);
     try{
@@ -51,10 +53,10 @@ export function SafehouseOwnerActions({market,wallet,chain,onMarketState}:{marke
     if(lock.current||!prepared||pending)return;lock.current=true;setBusy(true);let held=false;
     try{
       requireOwner();if(Date.now()>prepared.expires){setPrepared(null);throw Error("Preparation expired. Prepare again.");}
-      const provider=window.retium;if(!provider)throw Error("Wallet SDK not ready.");
+
       const p=prepared;persist(p);held=true;setPrepared(null);
       // Synchronous wallet request within click: no awaits before popup.
-      const waiting=provider.request({method:"retium_call",params:{contractId:p.contract,method:p.method,args:p.args,amountAtomic:"0"}});
+      const waiting=walletRequest("retium_call",{contractId:p.contract,method:p.method,args:p.args,amountAtomic:"0"});
       const r=await waiting as {txId?:string};if(!/^tx_[a-f0-9]{32}$/.test(r?.txId||""))throw Error("No TX ID returned. Inspect wallet history; do not resend.");
       persist({...p,txId:r.txId!});setNotice("TX đã gửi. Bấm Kiểm tra TX; không gửi lại.");
     }catch(e){if(held&&["4001","4300","4100","4101","4102","4200","-32602"].includes(String((e as {code?:unknown})?.code)))persist(null);setNotice(errorText(e));}finally{lock.current=false;setBusy(false);}
@@ -77,7 +79,7 @@ export function SafehouseOwnerActions({market,wallet,chain,onMarketState}:{marke
       persist(null);setRecovery("");setNotice(`${pending.method}: HardFinal, execution OK. Chỉ bước này đã hoàn tất.`);
     }catch(e){setNotice(errorText(e));}finally{lock.current=false;setBusy(false);}
   }
-  const blocked=busy||!!pending||!loaded||wallet!==SETUP_OWNER||chain!==3;
+  const blocked=busy||!!pending||!loaded||wallet!==SETUP_OWNER||chain!==RETIUM_CHAIN_ID;
   return <section className="lending-card"><h2>3. Kiểm tra RTD và cấp quyền cập nhật giá</h2>
     <p>Publisher được chỉ định (ví đã nạp 3 RTM test):</p><CopyValue value={ORACLE}/>
     <p>Approve chỉ cấp quyền 0.001 RTD. Probe chuyển 0.001 RTD vào và trả lại trong cùng giao dịch. Mỗi bước ký riêng, có phí RTM test.</p>

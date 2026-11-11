@@ -2,6 +2,8 @@
 import { CopyValue } from "./copy-value";
 import { UiText } from "./preferences";
 import { parseRememberedWallet } from "../lib/ui/remembered-wallet";
+import { walletRequest, RETIUM_WALLET_SDK } from "../lib/wallet/adapter";
+import { RETIUM_CHAIN_ID } from "../lib/network/public-config";
 
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import Script from "next/script";
@@ -80,20 +82,16 @@ export function SharedWalletProvider({
     setBusy(true);
     setNotice("");
     try {
-      if (!window.retium)
-        throw Error("Wallet SDK is loading. Wait a moment and try again.");
-      // Keep the wallet request directly in the user gesture, before any network await.
-      const a = (await window.retium.request({
-        method: "retium_requestAccounts",
-      })) as Account;
+      // Keep the wallet request directly in the user gesture.
+      const a = await walletRequest<Account>("retium_requestAccounts");
       if (
         !a ||
         !/^rete[0-9a-f]{68}$/.test(a.address) ||
-        Number(a.chainId) !== 3
+        Number(a.chainId) !== RETIUM_CHAIN_ID
       )
-        throw Error("Select the Retium test network (chain 3).");
+        throw Error(`Select the configured Retium test network (chain ${RETIUM_CHAIN_ID}).`);
       if (account && account.address !== a.address) await logout();
-      const next = { address: a.address, chainId: 3 };
+      const next = { address: a.address, chainId: RETIUM_CHAIN_ID };
       setAccount(next);
       setRemembered(false);
       try {
@@ -143,8 +141,8 @@ export function SharedWalletProvider({
       value={{ account, ready, busy, notice, remembered, connect, disconnect }}
     >
       <Script
-        src="https://wallet.retium.org/connect/sdk/retium-sdk-1.3.0.js"
-        integrity="sha384-FTG6s31+cSLKvZXfREum814s/L2AnqVyikuFQvMKIvFfAz40ksTcaXVbRmkHGGTU"
+        src={RETIUM_WALLET_SDK.src}
+        integrity={RETIUM_WALLET_SDK.integrity}
         crossOrigin="anonymous"
         strategy="afterInteractive"
         onError={() =>
@@ -166,7 +164,7 @@ export function DashboardWallet() {
   return (
     <section className="dashboard-wallet" aria-label="Wallet connection">
       <div>
-        <p className="eyebrow">{<UiText text={"YOUR WALLET · CHAIN 3"} />}</p>
+        <p className="eyebrow">{<UiText text={`YOUR WALLET · CHAIN ${RETIUM_CHAIN_ID}`} />}</p>
         <h2>
           {w.account ? (
             <UiText text={"Your wallet is ready to use"} />

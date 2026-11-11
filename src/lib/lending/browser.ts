@@ -3,18 +3,29 @@ import type { LendingConfig } from "./config";
 export type Fields = Record<string, string>;
 const address = /^rete[0-9a-f]{68}$/;
 export async function readPublic(path: string) {
-  const r = await fetch(`https://rpc.retium.org/api/${path}`, {
-    cache: "no-store",
-    credentials: "omit",
-    redirect: "error",
-    signal: AbortSignal.timeout(12000),
-    headers: { Accept: "application/json" },
-  });
-  if (!r.ok)
-    throw Error(`Retium API returned HTTP ${r.status}. Please retry the read.`);
-  const text = await r.text();
-  if (text.length > 100000) throw Error("Response too large.");
-  const value = JSON.parse(text);
+  const safePath = path.replace(/^\/+/, "");
+  if (
+    safePath.length > 600 ||
+    !/^(?:contract\/[0-9a-f]{64}(?:\/query\?method=(?:market|position|balance_of|allowance)&args=[0-9A-Za-z_,]*)?|wallet\/rete[0-9a-f]{68})$/.test(safePath)
+  ) {
+    throw Error("Unsupported lending read.");
+  }
+  const response = await fetch(
+    "/api/network/read?path=" + encodeURIComponent(safePath),
+    {
+      method: "GET",
+      cache: "no-store",
+      credentials: "same-origin",
+      redirect: "error",
+      signal: AbortSignal.timeout(15000),
+      headers: { Accept: "application/json" },
+    },
+  );
+  const raw = await response.text();
+  if (raw.length > 100000) throw Error("Response too large.");
+  const value = JSON.parse(raw);
+  if (!response.ok)
+    throw Error(typeof value?.error === "string" ? value.error : "Retium API returned HTTP " + response.status + ".");
   if (!value || typeof value !== "object") throw Error("Invalid API response.");
   return value;
 }

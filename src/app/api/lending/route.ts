@@ -2,10 +2,26 @@ import { NextResponse } from "next/server";
 import { lendingConfig } from "../../../lib/lending/config";
 import { lendingPlan } from "../../../lib/lending/plan";
 import { issueTrackingTicket } from "../../../lib/dex/server";
+import { assertFeatureReady } from "../../../lib/network/health";
 export async function GET() {
-  return NextResponse.json(lendingConfig(), {
-    headers: { "Cache-Control": "no-store" },
-  });
+  const config = lendingConfig();
+  if (!config.enabled) {
+    return NextResponse.json(config, {
+      headers: { "Cache-Control": "no-store" },
+    });
+  }
+  try {
+    await assertFeatureReady("lending");
+    return NextResponse.json(config, {
+      headers: { "Cache-Control": "no-store" },
+    });
+  } catch (error) {
+    return NextResponse.json({
+      ...config,
+      enabled: false,
+      reason: error instanceof Error ? error.message : "Lending health verification failed.",
+    }, { headers: { "Cache-Control": "no-store" } });
+  }
 }
 export async function POST(request: Request) {
   try {
@@ -22,6 +38,7 @@ export async function POST(request: Request) {
     const body = JSON.parse(raw);
     if (!body || typeof body !== "object" || Array.isArray(body))
       throw Error("Invalid request.");
+    await assertFeatureReady("lending");
     const plan = lendingPlan(lendingConfig(), body);
     return NextResponse.json(
       { plan, ticket: await issueTrackingTicket(plan) },
@@ -30,7 +47,7 @@ export async function POST(request: Request) {
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Lending preview failed." },
-      { status: 400 },
+      { status: /health check|disabled|verification|code hash|network/i.test(e instanceof Error ? e.message : "") ? 503 : 400 },
     );
   }
 }

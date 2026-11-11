@@ -1,4 +1,6 @@
 import { verifyDexTx } from "../transactions/verify";
+import { rpcGet } from "../rpc/client";
+import { assertFeatureReady } from "../network/health";
 export { verifyDexTx } from "../transactions/verify";
 import { readPool } from "./pool-read";
 import { parseReviewSnapshot, parseDeploymentAccount } from "./review-input";
@@ -21,19 +23,8 @@ import {
   type Pool,
 } from "./math";
 const directory = path.join(process.cwd(), "data");
-const rpc = (process.env.RETIUM_RPC_URL || "https://rpc.retium.org").replace(
-  /\/$/,
-  "",
-);
-export async function rpcRead(endpoint: string) {
-  const response = await fetch(`${rpc}/api/${endpoint}`, {
-    cache: "no-store",
-    signal: AbortSignal.timeout(12_000),
-  });
-  const data = await response.json();
-  if (!response.ok)
-    throw Error(`RPC unavailable (${response.status}). Try again later.`);
-  return data;
+export async function rpcRead(endpoint: string): Promise<Record<string, any>> {
+  return rpcGet<Record<string, any>>(endpoint);
 }
 async function query(contract: string, method: string, args: string[] = []) {
   // The current node treats commas as argument separators before URL decoding.
@@ -154,6 +145,7 @@ export async function issueTrackingTicket(plan: Plan) {
   return `${payload}.${createHmac("sha256", await key()).update(payload).digest("hex")}`;
 }
 export async function prepare(body: Record<string, unknown>) {
+  await assertFeatureReady("dex");
   const token = String(body.token || ""),
     wallet = String(body.wallet || "");
   if (!/^[0-9a-f]{64}$/.test(token) || !/^rete[0-9a-f]{68}$/.test(wallet))
@@ -270,7 +262,12 @@ export async function prepareDeploy(body: Record<string, unknown>) {
     : parseDeploymentAccount(body.accountSnapshot, wallet, Date.now());
   if (!Number.isSafeInteger(account.nonce) || account.nonce < 0)
     throw Error("Invalid wallet nonce.");
-  if (decimalAtomic(String(account.spendable ?? account.balance_rtm)) < UNIT)
+  if (decimalAtomic(
+    String(
+      account.spendable ??
+        ("balance_rtm" in account ? account.balance_rtm : undefined),
+    ),
+  ) < UNIT)
     throw Error(
       "Keep at least 1 RTM available as a fee buffer. Wallet shows the actual fee.",
     );

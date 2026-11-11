@@ -11,6 +11,7 @@ import {
   WalletRequired,
 } from "../../components/shared-wallet";
 import { assessFunding } from "../../lib/dex/funding";
+import { walletRequest } from "../../lib/wallet/adapter";
 import { tokenPage, marketSummary, reviewSnapshot } from "../../lib/dex/browser";
 import "./dex.css";
 import { useEffect, useRef, useState } from "react";
@@ -24,13 +25,6 @@ import {
   type Plan,
   type Pool,
 } from "../../lib/dex/math";
-type Provider = {
-  request(input: {
-    method: string;
-    params?: Record<string, unknown>;
-  }): Promise<unknown>;
-};
-const provider = () => window.retium as Provider | undefined;
 type Preview = {
   plan: Plan;
   ticket: string;
@@ -410,12 +404,10 @@ export default function DexPage() {
     }
     setUnknown(true);
     try {
-      const p = provider();
-      if (!p) throw Error("Wallet unavailable.");
-      const result = (await p.request({
-        method: "retium_call",
-        params: { ...ready.plan.call },
-      })) as { txId: string };
+      const result = await walletRequest<{ txId: string }>(
+        "retium_call",
+        { ...ready.plan.call },
+      );
       if (!/^tx_[0-9a-f]{32}$/.test(result.txId))
         throw Error(
           "No usable TX ID returned. Check wallet history; do not resend.",
