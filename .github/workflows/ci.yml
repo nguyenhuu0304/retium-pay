@@ -6,6 +6,10 @@ on:
   push:
     branches: [main, chore/network-registry-foundation]
 
+concurrency:
+  group: retium-pay-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   typecheck-and-build:
     runs-on: ubuntu-latest
@@ -14,7 +18,6 @@ jobs:
       APP_URL: http://localhost:3000
       RETIUM_RPC_URL: https://rpc.retium.org
       NEXT_PUBLIC_RETIUM_CHAIN_ID: "3"
-      RETIUM_CHAIN_ID: "3"
       RETIUM_PROTOCOL_VERSION: "6"
     steps:
       - name: Checkout
