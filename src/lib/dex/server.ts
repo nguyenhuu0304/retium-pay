@@ -1,5 +1,6 @@
 import { verifyDexTx } from "../transactions/verify";
 import { rpcGet } from "../rpc/client";
+import { getRetiumNetworkConfig } from "../network/registry";
 export { verifyDexTx } from "../transactions/verify";
 import { readPool } from "./pool-read";
 import { parseReviewSnapshot, parseDeploymentAccount } from "./review-input";
@@ -144,6 +145,12 @@ export async function issueTrackingTicket(plan: Plan) {
   return `${payload}.${createHmac("sha256", await key()).update(payload).digest("hex")}`;
 }
 export async function prepare(body: Record<string, unknown>) {
+  if (
+    process.env.NEXT_PUBLIC_RETIUM_DEX_CONTRACT_ID &&
+    !getRetiumNetworkConfig().dex.enabled
+  ) {
+    throw Error("DEX is disabled until the configured contract ID and code hash are verified and RETIUM_DEX_ENABLED=true.");
+  }
   const token = String(body.token || ""),
     wallet = String(body.wallet || "");
   if (!/^[0-9a-f]{64}$/.test(token) || !/^rete[0-9a-f]{68}$/.test(wallet))
