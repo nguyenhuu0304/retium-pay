@@ -1,11 +1,14 @@
 // Read-only deployment diagnostic. No database, credentials, signatures or transfers.
+import { getRetiumNetworkConfig } from "../../../lib/network/registry";
 let pending: { until: number; result: Promise<unknown> } | undefined;
 const sample = "tx_fc4507f0564e6498f7a3378721516581";
 
 async function inspectRPC() {
   let base: URL;
   try {
-    base = new URL((process.env.RETIUM_RPC_URL || "https://rpc.retium.org").trim());
+    const config = getRetiumNetworkConfig();
+    if (!config.rpcUrl) throw Error();
+    base = new URL(config.rpcUrl);
     if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash) throw Error();
   } catch {
     return { ok: false, configuration: "Invalid RPC URL; use https://rpc.retium.org without quotes, credentials, path or query." };
