@@ -20,7 +20,8 @@ export async function GET(request: Request) {
         await stakeSummary(u.searchParams.get("wallet") || ""),
         { headers: { "Cache-Control": "no-store" } },
       );
-    if (u.searchParams.get("view") === "tokens")
+    if (u.searchParams.get("view") === "tokens") {
+      await assertFeatureReady("dex");
       return NextResponse.json(
         await tokenPage(
           u.searchParams.get("cursor") || "0",
@@ -28,6 +29,7 @@ export async function GET(request: Request) {
         ),
         { headers: { "Cache-Control": "no-store" } },
       );
+    }
     if (u.searchParams.get("view") === "market") {
       await assertFeatureReady("dex");
       return NextResponse.json(
