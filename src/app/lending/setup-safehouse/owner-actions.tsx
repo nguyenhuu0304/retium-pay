@@ -51,10 +51,10 @@ export function SafehouseOwnerActions({market,wallet,chain,onMarketState}:{marke
     if(lock.current||!prepared||pending)return;lock.current=true;setBusy(true);let held=false;
     try{
       requireOwner();if(Date.now()>prepared.expires){setPrepared(null);throw Error("Preparation expired. Prepare again.");}
-      const provider=window.retium;if(!provider)throw Error("Wallet SDK not ready.");
+
       const p=prepared;persist(p);held=true;setPrepared(null);
       // Synchronous wallet request within click: no awaits before popup.
-      const waiting=provider.request({method:"retium_call",params:{contractId:p.contract,method:p.method,args:p.args,amountAtomic:"0"}});
+      const waiting=walletRequest("retium_call",{contractId:p.contract,method:p.method,args:p.args,amountAtomic:"0"});
       const r=await waiting as {txId?:string};if(!/^tx_[a-f0-9]{32}$/.test(r?.txId||""))throw Error("No TX ID returned. Inspect wallet history; do not resend.");
       persist({...p,txId:r.txId!});setNotice("TX đã gửi. Bấm Kiểm tra TX; không gửi lại.");
     }catch(e){if(held&&["4001","4300","4100","4101","4102","4200","-32602"].includes(String((e as {code?:unknown})?.code)))persist(null);setNotice(errorText(e));}finally{lock.current=false;setBusy(false);}
