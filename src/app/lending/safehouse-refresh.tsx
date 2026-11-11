@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { LendingConfig } from "../../lib/lending/config";
 import { readPublic, snapshot } from "../../lib/lending/browser";
+import { walletRequest } from "../../lib/wallet/adapter";
 import { checkedRefreshTx, prepareSafehouseRefresh, SAFEHOUSE_RATE, validateRefreshIntent, type RefreshIntent } from "../../lib/lending/safehouse-browser";
 
 type Props={config:LendingConfig;wallet:string;chain:number;oracle:string;disabled:boolean;onBlocked:(v:boolean)=>void;onFresh:(v:Awaited<ReturnType<typeof snapshot>>)=>void};
