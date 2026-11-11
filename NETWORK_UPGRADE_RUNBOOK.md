@@ -60,3 +60,32 @@ A configured ID is still not proof of deployment; compare the live code hash fir
 - Payment history and previously verified transaction records remain readable.
 - Never expose API keys, wallet seeds, private keys or signing payloads in
   diagnostics.
+
+
+## Runtime health and feature isolation
+
+Open `/network` in Retium Pay or request `GET /api/network/diagnostics`.
+The check is read-only and reports:
+
+- RPC `GET /health` reachability, node status, version, tick and peers.
+- Live DEX, Lending market and Lending asset contract IDs and code hashes.
+- Whether configured expected hashes match the contracts on the active RPC.
+- Independent readiness for DEX and Lending, plus the separate Payments status.
+- Configured versus observed network identity fields.
+
+The current public wire reference documents `GET /health` as returning
+`{status, tick, peers, version}`; it does not document chain ID or payload
+version in that response. Therefore diagnostics show chain ID and protocol
+version as **unverified** unless the node actually returns those fields. The
+configured values are expectations, not proof. Wallet connection separately
+checks the connected chain ID when the wallet returns it.
+
+DEX pool/market reads and DEX transaction previews require the DEX feature flag,
+a healthy node and a live code-hash match. Lending availability and transaction
+previews require the Lending flag plus matching market and asset code hashes.
+A failed check blocks only that on-chain feature. Payment APIs, payment history
+and Telegram notifications are not gated by DEX/Lending contract health.
+
+The diagnostics endpoint does not mutate feature flags. Operators must inspect
+the result, correct the Vercel environment variables, redeploy a preview, and
+re-run the checks before enabling a feature.
