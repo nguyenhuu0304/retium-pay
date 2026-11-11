@@ -18,7 +18,7 @@ Configure these Vercel environment variables for the target environment:
 | `RETIUM_CHAIN_ID` | Expected chain ID |
 | `RETIUM_PROTOCOL_VERSION` | Expected transaction payload version |
 | `RETIUM_DEX_ENABLED` | Set to `true` only after DEX verification |
-| `RETIUM_DEX_CONTRACT_ID` | Newly deployed DEX contract ID |
+| `NEXT_PUBLIC_RETIUM_DEX_CONTRACT_ID` | Newly deployed DEX contract ID (public identifier, never a secret) |
 | `RETIUM_DEX_CODE_HASH` | Expected DEX code hash |
 | `RETIUM_LENDING_ENABLED` | Set to `true` only after market verification |
 | `RETIUM_LENDING_MARKET` | Lending market contract ID |
@@ -27,8 +27,10 @@ Configure these Vercel environment variables for the target environment:
 | `RETIUM_LENDING_ASSET_CODE_HASH` | Expected debt asset code hash |
 
 Do not copy old contract IDs or code hashes into a new testnet environment.
-The legacy DEX ID is retained temporarily for migration diagnostics only; it
-is not marked verified and cannot enable the DEX feature.
+The legacy DEX ID remains as a compatibility fallback until a new ID is configured.
+When `NEXT_PUBLIC_RETIUM_DEX_CONTRACT_ID` is set, DEX transaction previews are
+blocked until `RETIUM_DEX_ENABLED=true` and `RETIUM_DEX_CODE_HASH` are configured.
+A configured ID is still not proof of deployment; compare the live code hash first.
 
 ## Upgrade checklist
 
