@@ -262,7 +262,12 @@ export async function prepareDeploy(body: Record<string, unknown>) {
     : parseDeploymentAccount(body.accountSnapshot, wallet, Date.now());
   if (!Number.isSafeInteger(account.nonce) || account.nonce < 0)
     throw Error("Invalid wallet nonce.");
-  if (decimalAtomic(String(account.spendable ?? account.balance_rtm)) < UNIT)
+  if (decimalAtomic(
+    String(
+      account.spendable ??
+        ("balance_rtm" in account ? account.balance_rtm : undefined),
+    ),
+  ) < UNIT)
     throw Error(
       "Keep at least 1 RTM available as a fee buffer. Wallet shows the actual fee.",
     );
