@@ -1,6 +1,5 @@
 import { verifyDexTx } from "../transactions/verify";
 import { rpcGet } from "../rpc/client";
-import { getRetiumNetworkConfig } from "../network/registry";
 import { assertFeatureReady } from "../network/health";
 export { verifyDexTx } from "../transactions/verify";
 import { readPool } from "./pool-read";
