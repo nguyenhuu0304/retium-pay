@@ -66,7 +66,7 @@ export async function GET() {
     },
     features: {
       payments: {
-        ready: true,
+        ready: null,
         mode: "off-chain payment services and history",
         note: "Payment history is independent of DEX/Lending contract health.",
       },
