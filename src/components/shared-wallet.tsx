@@ -164,7 +164,7 @@ export function DashboardWallet() {
   return (
     <section className="dashboard-wallet" aria-label="Wallet connection">
       <div>
-        <p className="eyebrow">{<UiText text={"YOUR WALLET · CHAIN 3"} />}</p>
+        <p className="eyebrow">{<UiText text={`YOUR WALLET · CHAIN ${RETIUM_CHAIN_ID}`} />}</p>
         <h2>
           {w.account ? (
             <UiText text={"Your wallet is ready to use"} />
