@@ -2,6 +2,7 @@
 import { CopyValue } from "./copy-value";
 import { UiText } from "./preferences";
 import { parseRememberedWallet } from "../lib/ui/remembered-wallet";
+import { walletRequest } from "../lib/wallet/adapter";
 
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import Script from "next/script";
@@ -80,12 +81,8 @@ export function SharedWalletProvider({
     setBusy(true);
     setNotice("");
     try {
-      if (!window.retium)
-        throw Error("Wallet SDK is loading. Wait a moment and try again.");
-      // Keep the wallet request directly in the user gesture, before any network await.
-      const a = (await window.retium.request({
-        method: "retium_requestAccounts",
-      })) as Account;
+      // Keep the wallet request directly in the user gesture.
+      const a = await walletRequest<Account>("retium_requestAccounts");
       if (
         !a ||
         !/^rete[0-9a-f]{68}$/.test(a.address) ||
