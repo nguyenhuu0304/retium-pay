@@ -28,11 +28,11 @@ type Diagnostic = {
     deployed: boolean;
     codeHash: string | null;
     hashMatched: boolean | null;
-    ready: boolean | null;
+    ready: boolean;
     error?: string;
   }>;
   features?: Record<string, {
-    ready: boolean;
+    ready: boolean | null;
     configured?: boolean;
     mode?: string;
     reason?: string | null;
