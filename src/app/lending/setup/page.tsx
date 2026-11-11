@@ -5,6 +5,7 @@ import { blake3 } from "@noble/hashes/blake3.js";
 import { useSharedWallet } from "../../../components/shared-wallet";
 import { CopyValue } from "../../../components/copy-value";
 import { readPublic } from "../../../lib/lending/browser";
+import { walletRequest } from "../../../lib/wallet/adapter";
 import {
   SETUP_OWNER,
   SETUP_HASH,
@@ -95,13 +96,11 @@ export default function Setup() {
     setState(s);
   }
   async function signer() {
-    if (!window.retium) throw Error("Wallet SDK is not ready.");
-    const a = (await window.retium.request({
-      method: "retium_requestAccounts",
-    })) as { address?: string; chainId?: number };
+    const a = await walletRequest<{ address?: string; chainId?: number }>(
+      "retium_requestAccounts",
+    );
     if (a.address !== SETUP_OWNER || Number(a.chainId) !== 3)
       throw Error("Select wallet ending a88cb37 on Retium testnet (chain 3).");
-    return window.retium;
   }
   async function verifyMarket(market: string) {
     const c = await readPublic(`contract/${market}`);
@@ -212,8 +211,6 @@ export default function Setup() {
         setPrepared(null);
         throw Error("Bản chuẩn bị hết hạn. Chuẩn bị lại trước khi ký.");
       }
-      const provider = window.retium;
-      if (!provider) throw Error("Wallet SDK is not ready.");
       hold = { ...state, stage: prepared.stage, txId: "", unknown: true };
       save(hold);
       const operation = prepared.stage;
@@ -221,10 +218,10 @@ export default function Setup() {
       setPrepared(null);
       // No await, fetch, account request or timer before this wallet request.
       // SDK 1.3.0 opens its popup synchronously, inside this signature-button gesture.
-      const waiting = provider.request({
-        method: operation === "deploy" ? "retium_deploy" : "retium_call",
+      const waiting = walletRequest(
+        operation === "deploy" ? "retium_deploy" : "retium_call",
         params,
-      });
+      );
       const result = (await waiting) as { txId?: string; contractId?: string };
       if (!txPattern.test(result?.txId || ""))
         throw Error(
