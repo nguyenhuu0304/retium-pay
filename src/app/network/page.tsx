@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import "./network.css";
 
 type Diagnostic = {
   checkedAt: string;
@@ -27,7 +28,7 @@ type Diagnostic = {
     deployed: boolean;
     codeHash: string | null;
     hashMatched: boolean | null;
-    ready: boolean;
+    ready: boolean | null;
     error?: string;
   }>;
   features?: Record<string, {
@@ -126,7 +127,7 @@ export default function NetworkPage() {
               <article className="network-feature" key={name}>
                 <div className="network-card-heading">
                   <h3>{name === "dex" ? "DEX" : name === "lending" ? "Lending" : "Payments & history"}</h3>
-                  {feature ? <Status ok={feature.ready} /> : <span className="network-status">Not checked</span>}
+                  {feature?.ready === null ? <span className="network-status">Independent</span> : feature ? <Status ok={feature.ready} /> : <span className="network-status">Not checked</span>}
                 </div>
                 <p>{feature?.reason || feature?.note || (name === "payments" ? "Independent from DEX and Lending contract status." : "Requires verified contracts on the active network.")}</p>
               </article>
