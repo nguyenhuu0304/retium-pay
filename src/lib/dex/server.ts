@@ -23,8 +23,8 @@ import {
   type Pool,
 } from "./math";
 const directory = path.join(process.cwd(), "data");
-export async function rpcRead(endpoint: string) {
-  return rpcGet(endpoint);
+export async function rpcRead(endpoint: string): Promise<Record<string, any>> {
+  return rpcGet<Record<string, any>>(endpoint);
 }
 async function query(contract: string, method: string, args: string[] = []) {
   // The current node treats commas as argument separators before URL decoding.
