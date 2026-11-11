@@ -7,6 +7,7 @@ import {
 import { splitFormat } from "../../lib/payments/split";
 import { CopyValue } from "../../components/copy-value";
 import { UiText } from "../../components/preferences";
+import { walletRequest } from "../../lib/wallet/adapter";
 
 import {
   useSharedWallet,
@@ -16,12 +17,6 @@ import {
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
-type Provider = {
-  request(input: {
-    method: string;
-    params?: Record<string, unknown>;
-  }): Promise<unknown>;
-};
 type Challenge = { nonce: string; statement: string };
 type Signature = {
   address: string;
@@ -99,9 +94,6 @@ async function post<T>(body: Record<string, unknown>): Promise<T> {
   if (!response.ok)
     throw new ApiError(data.error || "Request failed.", response.status);
   return data;
-}
-function wallet() {
-  return (window as unknown as { retium?: Provider }).retium;
 }
 function errorText(error: unknown) {
   if (
@@ -296,16 +288,12 @@ export default function RequestsPage() {
     }
   }
   async function sign() {
-    const provider = wallet();
-    if (!provider || !challenge || lock.current) return;
+    if (!challenge || lock.current) return;
     lock.current = true;
     setBusy(true);
     setNotice("");
     try {
-      const result = (await provider.request({
-        method: "retium_signAuth",
-        params: challenge,
-      })) as Signature;
+      const result = await walletRequest<Signature>("retium_signAuth", challenge);
       const session = await post<{ address: string; expiresAt: number }>({
         action: "verifyList",
         ...result,
