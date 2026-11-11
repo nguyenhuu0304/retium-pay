@@ -2,6 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import { CopyValue } from "../../../components/copy-value";
 import { readPublic } from "../../../lib/lending/browser";
+import { walletRequest } from "../../../lib/wallet/adapter";
+import { RETIUM_CHAIN_ID } from "../../../lib/network/public-config";
 import { SETUP_OWNER, SETUP_HASH, SETUP_ASSET, SETUP_ASSET_HASH } from "../../../lib/lending/setup-safehouse";
 const ORACLE = "rete5562395fa3d8f4713742d55de025e43ed6e34628ef3657e39033b069808527229e82";
 const PROBE = "1000000000000000";
