@@ -6,6 +6,7 @@ import { useSharedWallet } from "../../../components/shared-wallet";
 import { CopyValue } from "../../../components/copy-value";
 import { readPublic } from "../../../lib/lending/browser";
 import { walletRequest } from "../../../lib/wallet/adapter";
+import { RETIUM_CHAIN_ID } from "../../../lib/network/public-config";
 import {
   SETUP_OWNER,
   SETUP_HASH,
@@ -101,8 +102,8 @@ export default function Setup() {
     const a = await walletRequest<{ address?: string; chainId?: number }>(
       "retium_requestAccounts",
     );
-    if (a.address !== SETUP_OWNER || Number(a.chainId) !== 3)
-      throw Error("Select wallet ending a88cb37 on Retium testnet (chain 3).");
+    if (a.address !== SETUP_OWNER || Number(a.chainId) !== RETIUM_CHAIN_ID)
+      throw Error("Select wallet ending a88cb37 on the configured Retium testnet.");
   }
   async function verifyMarket(market: string) {
     const c = await readPublic(`contract/${market}`);
@@ -210,8 +211,8 @@ export default function Setup() {
     setLastError("");
     let hold: State | null = null;
     try {
-      if (account?.address !== SETUP_OWNER || Number(account.chainId) !== 3)
-        throw Error("Select wallet 37 on testnet chain 3.");
+      if (account?.address !== SETUP_OWNER || Number(account.chainId) !== RETIUM_CHAIN_ID)
+        throw Error("Select wallet 37 on the configured Retium testnet.");
       if (Date.now() > prepared.expiresAt) {
         setPrepared(null);
         throw Error("Bản chuẩn bị hết hạn. Chuẩn bị lại trước khi ký.");
