@@ -92,9 +92,13 @@ fn save_pool(p: &Pool) -> Result<(), String> {
 
 fn sqrt(n: u128) -> u128 {
     if n < 2 { return n; }
+    // Avoid n + 1 overflowing for u128::MAX.
     let mut x = n;
-    let mut y = (x + 1) / 2;
-    while y < x { x = y; y = (x + n / x) / 2; }
+    let mut y = x / 2 + 1;
+    while y < x {
+        x = y;
+        y = (x + n / x) / 2;
+    }
     x
 }
 
@@ -121,12 +125,6 @@ fn token_transfer_from(token: &str, from: &str, to: &str, amount: u128) {
     let reply = call::contract(token, "transfer_from", &[from, to, &amount.to_string()])
         .unwrap_or_else(|_| fail("token transfer_from call failed"));
     if call::is_error_reply(&reply) { fail("token transfer_from was refused"); }
-}
-
-fn token_transfer(token: &str, to: &str, amount: u128) {
-    let reply = call::contract(token, "transfer", &[to, &amount.to_string()])
-        .unwrap_or_else(|_| fail("token transfer call failed"));
-    if call::is_error_reply(&reply) { fail("token transfer was refused"); }
 }
 
 fn list_pools(c: &Call) -> Reply {
@@ -287,25 +285,60 @@ fn remove_liquidity(c: &Call) -> Reply {
 
 fn lock_liquidity(c: &Call) -> Reply {
     let token = c.arg(0)?;
-    let total = parse_u128(c.arg(1)?, "locked LP total")?;
+    let total_raw = c.arg(1)?;
+    let total = if total_raw == "0" {
+        0
+    } else {
+        parse_u128(total_raw, "locked LP total")?
+    };
     let until_raw = c.arg(2)?;
     if !valid_id(token) || read_pool(token)?.is_none() { return error("pool not found"); }
     if c.value() != 0 { return error("do not attach RTM to LP lock"); }
-    let until = until_raw.parse::<i64>().map_err(|_| "invalid lock timestamp")?;
+
+    let balance = storage::get_u128(&lp_key(token, c.caller()))?;
+    let lock_key = lock_key(token, c.caller());
+    let until_key = format!("until:{token}:{}", c.caller());
+    let old_locked = storage::get_u128(&lock_key)?;
+    let old_until = storage::get_or(&until_key, "0")?
+        .parse::<i64>()
+        .map_err(|_| "corrupt lock state")?;
     let now = env::block_time_ms();
+
+    if total > balance || total < old_locked {
+        return error("locked LP total must be between existing lock and LP balance");
+    }
+
+    // An expired finite lock can be cleared. Active and permanent locks cannot.
+    if total == 0 {
+        if old_locked > 0 && (old_until == -1 || now < old_until) {
+            return error("an active or permanent LP lock cannot be released");
+        }
+        storage::set_u128(&lock_key, 0)?;
+        storage::set(&until_key, "0")?;
+        events::emit_fields("liquidity_unlocked", &[
+            ("owner", c.caller()),
+            ("token", token),
+            ("unlocked", &old_locked.to_string()),
+        ])?;
+        return ok("0|0");
+    }
+
+    let until = until_raw.parse::<i64>().map_err(|_| "invalid lock timestamp")?;
     if until != -1 && (until <= now || until > now.saturating_add(3650_i64 * 86_400_000)) {
         return error("lock must be between now and ten years, or -1 for permanent");
     }
-    let balance = storage::get_u128(&lp_key(token, c.caller()))?;
-    let old_locked = storage::get_u128(&lock_key(token, c.caller()))?;
-    let old_until = storage::get_or(&format!("until:{token}:{}", c.caller()), "0")?.parse::<i64>().map_err(|_| "corrupt lock state")?;
-    if total < old_locked || total > balance { return error("locked LP total must be between existing lock and LP balance"); }
     if old_locked > 0 && (old_until == -1 || (until != -1 && until < old_until)) {
         return error("an active LP lock cannot be shortened");
     }
-    storage::set_u128(&lock_key(token, c.caller()), total)?;
-    storage::set(&format!("until:{token}:{}", c.caller()), &until.to_string())?;
-    events::emit_fields("liquidity_locked", &[("owner", c.caller()), ("token", token), ("locked", &total.to_string()), ("until_ms", &until.to_string())])?;
+
+    storage::set_u128(&lock_key, total)?;
+    storage::set(&until_key, &until.to_string())?;
+    events::emit_fields("liquidity_locked", &[
+        ("owner", c.caller()),
+        ("token", token),
+        ("locked", &total.to_string()),
+        ("until_ms", &until.to_string()),
+    ])?;
     ok(&format!("{total}|{until}"))
 }
 
@@ -330,6 +363,7 @@ mod tests {
         assert_eq!(sqrt(15), 3);
         assert_eq!(sqrt(16), 4);
         assert_eq!(sqrt(17), 4);
+        assert_eq!(sqrt(u128::MAX), 18_446_744_073_709_551_615);
     }
 
     #[test]
