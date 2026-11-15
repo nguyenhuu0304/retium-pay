@@ -116,6 +116,18 @@ fn token_transfer_from(token: &str, from: &str, to: &str, amount: u128) {
     if call::is_error_reply(&reply) { fail("token transfer_from was refused"); }
 }
 
+fn token_transfer(token: &str, to: &str, amount: u128) {
+    let reply = call::contract(token, "transfer", &[to, &amount.to_string()])
+        .unwrap_or_else(|_| fail("token transfer call failed"));
+    if call::is_error_reply(&reply) { fail("token transfer was refused"); }
+}
+
+fn send_rtm(to: &str, amount: u128) {
+    let reply = call::send_rtm(to, amount)
+        .unwrap_or_else(|_| fail("RTM payout call failed"));
+    if call::is_error_reply(&reply) { fail("RTM payout was refused"); }
+}
+
 fn list_pools(c: &Call) -> Reply {
     let cursor = match c.args().first() {
         Some(v) => v.parse::<usize>().map_err(|_| "invalid cursor")?,
@@ -181,8 +193,7 @@ fn swap(c: &Call) -> Reply {
         p.reserve_rtm = p.reserve_rtm.checked_add(amount).ok_or("reserve overflow")?;
         p.reserve_token = p.reserve_token.checked_sub(out).ok_or("reserve underflow")?;
         save_pool(&p)?;
-        let reply = call::contract(token, "transfer", &[c.caller(), &out.to_string()])?;
-        if call::is_error_reply(&reply) { fail("token payout refused"); }
+        token_transfer(token, c.caller(), out);
     } else {
         if c.value() != 0 { return error("do not attach RTM to token-to-RTM swap"); }
         token_transfer_from(token, c.caller(), &env::contract_id()?, amount);
@@ -278,10 +289,8 @@ fn remove_liquidity(c: &Call) -> Reply {
     p.reserve_token = p.reserve_token.checked_sub(out_token).ok_or("reserve underflow")?;
     p.lp_supply = p.lp_supply.checked_sub(shares).ok_or("LP supply underflow")?;
     save_pool(&p)?;
-    let token_reply = call::contract(token, "transfer", &[c.caller(), &out_token.to_string()])?;
-    if call::is_error_reply(&token_reply) { fail("token payout refused"); }
-    let rtm_reply = call::send_rtm(c.caller(), out_rtm)?;
-    if call::is_error_reply(&rtm_reply) { fail("RTM payout refused"); }
+    token_transfer(token, c.caller(), out_token);
+    send_rtm(c.caller(), out_rtm);
     events::emit_fields("liquidity_removed", &[("provider", c.caller()), ("token", token), ("lp_burned", &shares.to_string()), ("rtm", &out_rtm.to_string()), ("token_amount", &out_token.to_string())])?;
     ok(&format!("{out_rtm}|{out_token}"))
 }
