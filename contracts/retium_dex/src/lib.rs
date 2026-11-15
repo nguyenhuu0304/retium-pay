@@ -26,7 +26,6 @@ struct Pool {
 
 pub fn handle(c: Call) -> Reply {
     match c.action() {
-        "init" => init(&c),
         "list_pools" => list_pools(&c),
         "get_pool" => get_pool(&c),
         "get_lp_balance" => get_lp_balance(&c),
@@ -37,16 +36,6 @@ pub fn handle(c: Call) -> Reply {
         "lock_liquidity" => lock_liquidity(&c),
         other => error(&format!("unknown DEX method: {other}")),
     }
-}
-
-fn init(c: &Call) -> Reply {
-    if !storage::get_or("owner", "")?.is_empty() {
-        return error("DEX already initialized");
-    }
-    storage::set("owner", c.caller())?;
-    storage::set_u128("pool_count", 0)?;
-    events::emit_fields("dex_initialized", &[("owner", c.caller())])?;
-    ok(c.caller())
 }
 
 fn valid_id(value: &str) -> bool {
@@ -279,6 +268,12 @@ fn remove_liquidity(c: &Call) -> Reply {
     let out_token = mul_div(p.reserve_token, shares, p.lp_supply)?;
     if out_rtm < min_rtm || out_token < min_token || out_rtm == 0 || out_token == 0 { return error("minimum withdrawal not met"); }
     storage::sub_u128(&key, shares)?;
+    // Expired locks are no longer restrictions; clear stale lock metadata so
+    // the public position remains internally consistent after withdrawal.
+    if locked > 0 && effective_locked == 0 {
+        storage::set_u128(&lock_key(token, c.caller()), 0)?;
+        storage::set(&format!("until:{token}:{}", c.caller()), "0")?;
+    }
     p.reserve_rtm = p.reserve_rtm.checked_sub(out_rtm).ok_or("reserve underflow")?;
     p.reserve_token = p.reserve_token.checked_sub(out_token).ok_or("reserve underflow")?;
     p.lp_supply = p.lp_supply.checked_sub(shares).ok_or("LP supply underflow")?;
