@@ -35,6 +35,8 @@ Do not deploy or enable the DApp until tests pass, the dry-run passes, and the c
 ## Important implementation notes
 
 - Swap fee is 0.3%, matching the current Retium Pay quote model.
+
+- Liquidity minting and swap quote intermediates use checked 256-bit integer arithmetic (`ethnum::U256`) so common 18-decimal deposits do not overflow `u128` before division. Results that cannot fit the contract's stored `u128` amounts are rejected.
 - The contract uses chain block time for deadlines and LP locks. Expired finite locks no longer block withdrawals; permanent locks remain locked.
 - Every cross-contract token transfer checks for an error reply and traps on refusal so the whole transaction rolls back.
 - The first 1,000 LP units are permanently excluded from user balances as minimum liquidity.
