@@ -9,8 +9,10 @@ function checked(value: unknown, token?: string): Pool {
 export async function readPool(query: Query, token: string): Promise<Pool | null> {
   try { return checked(JSON.parse(await query(DEX, "get_pool", [token])), token); }
   catch (error) {
-    // A generic HTTP 400 is NOT evidence of absence. Confirm against the complete list.
-    if (!(error instanceof Error) || !/\(400\)|Pool not found|negative output length/i.test(error.message)) throw error;
+    // Some RPC nodes can return a stale or mismatched get_pool result.
+    // A mismatch is not evidence that the requested pool is absent: verify
+    // the exact token against list_pools before deciding.
+    if (!(error instanceof Error) || !/\(400\)|Pool not found|negative output length|Wrong pool returned/i.test(error.message)) throw error;
   }
   let cursor = 0;
   for (let page = 0; page < 100; page++) {
