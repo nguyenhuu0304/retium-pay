@@ -94,6 +94,7 @@ export async function tokenInfo(token: string) {
       )
       ?.slice(7) || token.slice(0, 10);
   return {
+    name: typeof meta?.rcp_type === "string" && meta.rcp_type.trim() ? meta.rcp_type.trim() : "Unknown token",
     symbol:
       /^[A-Za-z0-9._-]{1,20}$/.test(symbol) && symbol !== "RTM"
         ? symbol
@@ -177,6 +178,7 @@ export async function prepare(body: Record<string, unknown>) {
     plan,
     ticket: `${payload}.${sig}`,
     market: {
+      name: m.info.name,
       symbol: m.info.symbol,
       codeHash: m.info.codeHash,
       pool: m.pool,
