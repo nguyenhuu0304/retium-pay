@@ -87,6 +87,35 @@ export async function tokenInfo(token: string) {
     codeHash: data.code_hash,
   };
 }
+
+export async function tokenWalletSummary(token: string, wallet: string) {
+  if (!/^[0-9a-f]{64}$/.test(token) || !/^rete[0-9a-f]{68}$/.test(wallet))
+    throw Error("Enter a valid token contract and connect a Retium wallet.");
+  const data = await rpcRead(`contract/${token}`);
+  if (data.contract_id !== token) throw Error("Wrong token returned by RPC.");
+  const meta = data.rcp_metadata || {};
+  const traits: unknown[] = Array.isArray(meta.traits) ? meta.traits : [];
+  const caps: unknown[] = Array.isArray(meta.capabilities) ? meta.capabilities : [];
+  if (!traits.includes("fungible") || !caps.includes("balance_of"))
+    throw Error("This contract does not expose a fungible-token balance.");
+  const symbol = traits.find((x): x is string => typeof x === "string" && x.startsWith("symbol:"))?.slice(7) || token.slice(0, 10);
+  const decimalsTrait = traits.find((x): x is string => typeof x === "string" && x.startsWith("decimals:"));
+  const decimals = decimalsTrait ? Number(decimalsTrait.slice(9)) : Number(meta.decimals ?? 18);
+  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 36)
+    throw Error("Token declares an unsupported decimal precision.");
+  const raw = atomic(await query(token, "balance_of", [wallet]));
+  const scale = 10n ** BigInt(decimals);
+  const whole = raw / scale;
+  const fraction = raw % scale;
+  const balance = decimals === 0 ? whole.toString() : `${whole}.${fraction.toString().padStart(decimals, "0").replace(/0+$/, "") || "0"}`;
+  return {
+    name: typeof meta.rcp_type === "string" && meta.rcp_type.trim() ? meta.rcp_type.trim() : "Unknown token",
+    symbol: /^[A-Za-z0-9._-]{1,20}$/.test(symbol) ? symbol : token.slice(0, 10),
+    decimals,
+    balance,
+    codeHash: String(data.code_hash || ""),
+  };
+}
 export async function market(token: string, wallet: string) {
   const info = await tokenInfo(token);
   const pool = await readPool(query, token);
