@@ -1,0 +1,18 @@
+[package]
+name = "retium_dex"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+retium-contract = { git = "https://github.com/Retium-Org/retium-sdk", package = "retium-contract" }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
