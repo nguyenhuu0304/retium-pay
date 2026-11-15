@@ -9,6 +9,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 retium-contract = { git = "https://github.com/Retium-Org/retium-sdk", package = "retium-contract" }
+ethnum = { version = "=1.5.3", default-features = false }
 
 [profile.release]
 opt-level = "z"
