@@ -108,7 +108,7 @@ export async function market(token: string, wallet: string) {
   const balanceToken = atomic(await query(token, "balance_of", [wallet]));
   const allowance = atomic(await query(token, "allowance", [wallet, DEX]));
   const position = pool
-    ? JSON.parse(await query(DEX, "get_lp_balance", [token, wallet]))
+    ? decodeContractData(await query(DEX, "get_lp_balance", [token, wallet]))
     : { lp_balance: "0", locked: "0", until_ms: 0 };
   const lp = atomic(position.lp_balance),
     locked = atomic(position.locked);
