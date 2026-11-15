@@ -2,7 +2,7 @@ import { verifyDexTx } from "../transactions/verify";
 import { rpcGet } from "../rpc/client";
 import { assertFeatureReady } from "../network/health";
 export { verifyDexTx } from "../transactions/verify";
-import { readPool } from "./pool-read";
+import { decodeContractData, readPool } from "./pool-read";
 import { parseReviewSnapshot, parseDeploymentAccount } from "./review-input";
 import { blake3 } from "@noble/hashes/blake3.js";
 import {
@@ -48,7 +48,7 @@ async function query(contract: string, method: string, args: string[] = []) {
 }
 export async function pools(cursor: string) {
   if (!/^[0-9]{1,12}$/.test(cursor)) throw Error("Invalid cursor.");
-  const data = JSON.parse(
+  const data = decodeContractData(
     await query(DEX, "list_pools", cursor === "0" ? [] : [cursor]),
   );
   const list = Array.isArray(data) ? data : data.pools;
