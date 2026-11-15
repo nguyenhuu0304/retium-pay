@@ -2,11 +2,12 @@
 extern crate alloc;
 
 use alloc::{format, string::{String, ToString}, vec::Vec};
+use ethnum::U256;
 use retium_contract::{call, entrypoint, env, error, events, fail, ok, storage, Call, Reply};
 
 entrypoint!(handle);
 retium_contract::rcp_metadata!(
-    r#"{"rcp_type":"dex","traits":["automated_market_maker","constant_product"],"capabilities":["swap","create_pool","add_liquidity","remove_liquidity","lp_positions","lp_lock"],"lockable_fields":[],"evolves_from":"","weight":5,"version":"v1.0.0"}"#
+    r#"{"rcp_type":"dex","traits":["automated_market_maker","constant_product"],"capabilities":["swap","create_pool","add_liquidity","remove_liquidity","lp_positions","lp_lock"],"lockable_fields":[],"evolves_from":"","weight":5,"version":"v1.0.1"}"#
 );
 
 const POOL_PREFIX: &str = "pool:";
@@ -79,26 +80,59 @@ fn save_pool(p: &Pool) -> Result<(), String> {
     storage::set(&pool_key(&p.token), &format!("{}|{}|{}", p.reserve_rtm, p.reserve_token, p.lp_supply))
 }
 
-fn sqrt(n: u128) -> u128 {
-    if n < 2 { return n; }
-    // Avoid n + 1 overflowing for u128::MAX.
-    let mut x = n;
-    let mut y = x / 2;
-    while y < x {
-        x = y;
-        y = (x + n / x) / 2;
-    }
-    x
+fn u256(value: u128) -> U256 {
+    U256::from_words(0, value)
 }
 
+// Full-precision floor(a * b / d). The 256-bit intermediate prevents
+// ordinary 18-decimal token amounts from overflowing u128 before division.
 fn mul_div(a: u128, b: u128, d: u128) -> Result<u128, String> {
     if d == 0 { return Err("division by zero".into()); }
-    a.checked_mul(b).ok_or_else(|| "amount multiplication overflow".to_string()).map(|v| v / d)
+    let product = u256(a).checked_mul(u256(b))
+        .ok_or_else(|| "wide multiplication overflow".to_string())?;
+    let quotient = product.checked_div(u256(d))
+        .ok_or_else(|| "division by zero".to_string())?;
+    if quotient > u256(u128::MAX) {
+        return Err("calculated amount exceeds u128".into());
+    }
+    Ok(quotient.as_u128())
 }
 
-fn ceil_div(a: u128, b: u128) -> Result<u128, String> {
-    if b == 0 { return Err("division by zero".into()); }
-    Ok(a / b + u128::from(a % b != 0))
+fn mul_div_ceil(a: u128, b: u128, d: u128) -> Result<u128, String> {
+    if d == 0 { return Err("division by zero".into()); }
+    let product = u256(a).checked_mul(u256(b))
+        .ok_or_else(|| "wide multiplication overflow".to_string())?;
+    let (mut quotient, remainder) = product.checked_div_rem(u256(d))
+        .ok_or_else(|| "division by zero".to_string())?;
+    if remainder != U256::ZERO {
+        quotient = quotient.checked_add(U256::ONE)
+            .ok_or_else(|| "rounded amount overflow".to_string())?;
+    }
+    if quotient > u256(u128::MAX) {
+        return Err("calculated amount exceeds u128".into());
+    }
+    Ok(quotient.as_u128())
+}
+
+// Floor(sqrt(a * b)) without truncating or overflowing the 256-bit product.
+// The result is guaranteed to fit u128 because a and b are each u128.
+fn sqrt_product(a: u128, b: u128) -> Result<u128, String> {
+    let product = u256(a).checked_mul(u256(b))
+        .ok_or_else(|| "initial liquidity product overflow".to_string())?;
+    let mut low = 0u128;
+    let mut high = u128::MAX;
+    while low < high {
+        let distance = high - low;
+        let mid = low + distance / 2 + distance % 2;
+        let square = u256(mid).checked_mul(u256(mid))
+            .ok_or_else(|| "square-root comparison overflow".to_string())?;
+        if square <= product {
+            low = mid;
+        } else {
+            high = mid - 1;
+        }
+    }
+    Ok(low)
 }
 
 fn ensure_deadline(raw: &str) -> Result<(), String> {
@@ -185,8 +219,17 @@ fn swap(c: &Call) -> Reply {
         "TOKEN_TO_RTM" => (p.reserve_token, p.reserve_rtm, false),
         _ => return error("invalid swap direction"),
     };
-    let amount_fee = amount.checked_mul(FEE_NUM).ok_or("amount overflow")?;
-    let out = mul_div(amount_fee, reserve_out, reserve_in.checked_mul(FEE_DEN).ok_or("reserve overflow")?.checked_add(amount_fee).ok_or("reserve overflow")?)?;
+    let amount_fee = u256(amount).checked_mul(u256(FEE_NUM))
+        .ok_or("swap fee multiplication overflow")?;
+    let numerator = amount_fee.checked_mul(u256(reserve_out))
+        .ok_or("swap numerator overflow")?;
+    let denominator = u256(reserve_in).checked_mul(u256(FEE_DEN))
+        .and_then(|v| v.checked_add(amount_fee))
+        .ok_or("swap denominator overflow")?;
+    let output = numerator.checked_div(denominator)
+        .ok_or("invalid swap denominator")?;
+    if output > u256(u128::MAX) { return error("swap output exceeds supported amount"); }
+    let out = output.as_u128();
     if out == 0 || out < min_out || out >= reserve_out { return error("slippage exceeded or insufficient liquidity"); }
     if input_is_rtm {
         if c.value() != amount { return error("attached RTM must equal swap input"); }
@@ -214,8 +257,7 @@ fn create_pool(c: &Call) -> Reply {
     if !valid_id(token) { return error("invalid token contract id"); }
     if c.value() != amount_rtm { return error("attached RTM must equal initial RTM deposit"); }
     if read_pool(token)?.is_some() { return error("pool already exists"); }
-    let product = amount_rtm.checked_mul(amount_token).ok_or("initial liquidity overflow")?;
-    let root = sqrt(product);
+    let root = sqrt_product(amount_rtm, amount_token)?;
     let minted = root.checked_sub(MINIMUM_LIQUIDITY).ok_or("initial liquidity is too small")?;
     if minted == 0 { return error("initial liquidity is too small"); }
     token_transfer_from(token, c.caller(), &env::contract_id()?, amount_token);
@@ -238,7 +280,7 @@ fn add_liquidity(c: &Call) -> Reply {
     if c.value() != amount_rtm { return error("attached RTM must equal liquidity deposit"); }
     let mut p = match read_pool(token)? { Some(p) => p, None => return error("Pool not found") };
     if p.reserve_rtm == 0 || p.reserve_token == 0 || p.lp_supply == 0 { return error("invalid pool reserves"); }
-    let token_amount = ceil_div(amount_rtm.checked_mul(p.reserve_token).ok_or("amount overflow")?, p.reserve_rtm)?;
+    let token_amount = mul_div_ceil(amount_rtm, p.reserve_token, p.reserve_rtm)?;
     if token_amount > max_token { return error("token maximum exceeded"); }
     let lp_a = mul_div(amount_rtm, p.lp_supply, p.reserve_rtm)?;
     let lp_b = mul_div(token_amount, p.lp_supply, p.reserve_token)?;
@@ -370,27 +412,29 @@ mod tests {
     }
 
     #[test]
-    fn square_root_is_floor_and_handles_edges() {
-        assert_eq!(sqrt(0), 0);
-        assert_eq!(sqrt(1), 1);
-        assert_eq!(sqrt(2), 1);
-        assert_eq!(sqrt(3), 1);
-        assert_eq!(sqrt(15), 3);
-        assert_eq!(sqrt(16), 4);
-        assert_eq!(sqrt(17), 4);
-        assert_eq!(sqrt(u128::MAX), 18_446_744_073_709_551_615);
+    fn sqrt_product_handles_18_decimal_initial_liquidity() {
+        let amount = 50_000_000_000_000_000_000u128;
+        assert_eq!(sqrt_product(amount, amount).unwrap(), amount);
+        assert_eq!(sqrt_product(15, 1).unwrap(), 3);
+        assert_eq!(sqrt_product(16, 1).unwrap(), 4);
+        assert_eq!(sqrt_product(17, 1).unwrap(), 4);
     }
 
     #[test]
-    fn ceil_div_never_rounds_token_deposit_down() {
-        assert_eq!(ceil_div(10, 3).unwrap(), 4);
-        assert_eq!(ceil_div(9, 3).unwrap(), 3);
-    }
-
-    #[test]
-    fn checked_mul_div_rejects_overflow_and_zero_denominator() {
+    fn wide_mul_div_preserves_precision_without_u128_intermediate_overflow() {
+        assert_eq!(mul_div(u128::MAX, 2, 2).unwrap(), u128::MAX);
         assert!(mul_div(u128::MAX, 2, 1).is_err());
         assert!(mul_div(10, 10, 0).is_err());
         assert_eq!(mul_div(100, 25, 10).unwrap(), 250);
+    }
+
+    #[test]
+    fn ceil_mul_div_never_rounds_token_deposit_down() {
+        assert_eq!(mul_div_ceil(10, 1, 3).unwrap(), 4);
+        assert_eq!(mul_div_ceil(9, 1, 3).unwrap(), 3);
+        assert_eq!(
+            mul_div_ceil(50_000_000_000_000_000_000, 50_000_000_000_000_000_000, 50_000_000_000_000_000_000).unwrap(),
+            50_000_000_000_000_000_000
+        );
     }
 }
