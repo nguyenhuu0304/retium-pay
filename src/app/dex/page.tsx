@@ -29,6 +29,7 @@ type Preview = {
   plan: Plan;
   ticket: string;
   market: {
+    name: string;
     symbol: string;
     pool: Pool | null;
     lp: string;
@@ -779,7 +780,10 @@ export default function DexPage() {
             <div className="asset-box">
               <div className="asset-caption">
                 <span>{<UiText text={"To"} />}</span>
-                <span>{<UiText text={"Estimated"} />}</span>
+                <span>
+                  {<UiText text={"Balance: "} />}
+                  {inputRtm && activeMarket ? displayAmount(BigInt(activeMarket.balanceToken)) : walletRtm}
+                </span>
               </div>
               <div className="asset-line">
                 <button
@@ -837,8 +841,11 @@ export default function DexPage() {
           </>
         )}
         {marketError && <p className="inline-error">{marketError}</p>}
-        {action !== "swap" && activeMarket && (
+        {activeMarket && (
           <div className="position-info">
+            <span>
+              <b>{activeMarket.name} ({symbol})</b>
+            </span>
             <span>
               {<UiText text={"Available RTM"} />}{" "}
               <b>{displayAmount(BigInt(activeMarket.balanceRtm))}</b>
