@@ -109,7 +109,7 @@ export async function market(token: string, wallet: string) {
   if (!Number.isSafeInteger(nonce) || nonce < 0)
     throw Error("RPC did not return a usable wallet nonce.");
   // spendable and balance_rtm are decimal RTM in the current wallet API.
-  const balanceRtm = decimalAtomic(account.spendable ?? account.balance_rtm);
+  const balanceRtm = decimalAtomic(account.balance_rtm);
   return {
     info,
     pool,
@@ -172,7 +172,7 @@ export async function walletRtmBalance(wallet: string) {
   if (!/^rete[0-9a-f]{68}$/.test(wallet))
     throw Error("Invalid wallet address.");
   const account = await rpcRead(`wallet/${wallet}`);
-  return decimalAtomic(account.spendable ?? account.balance_rtm).toString();
+  return decimalAtomic(account.balance_rtm).toString();
 }
 
 export async function marketSummary(token: string, wallet: string) {
