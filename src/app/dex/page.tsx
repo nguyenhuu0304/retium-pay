@@ -133,7 +133,9 @@ export default function DexPage() {
     [confirmed, setConfirmed] = useState(false),
     [clock, setClock] = useState(0);
   const [backgroundTxs, setBackgroundTxs] = useState<Recovery[]>([]);
-  const [marketVersion, setMarketVersion] = useState(0);\n  const [tokenWallet, setTokenWallet] = useState<{name:string;symbol:string;decimals:number;balance:string;codeHash:string}|null>(null);\n  const [tokenWalletError, setTokenWalletError] = useState("");
+  const [marketVersion, setMarketVersion] = useState(0);
+  const [tokenWallet, setTokenWallet] = useState<{name:string;symbol:string;decimals:number;balance:string;codeHash:string}|null>(null);
+  const [tokenWalletError, setTokenWalletError] = useState("");
   const [picker, setPicker] = useState(false),
     [filter, setFilter] = useState(""),
     [selectedSymbol, setSelectedSymbol] = useState(""),
@@ -156,6 +158,27 @@ export default function DexPage() {
       });
     return () => { cancelled = true; };
   }, [wallet, marketVersion]);
+  useEffect(() => {
+    if (!token || !wallet) {
+      setTokenWallet(null);
+      setTokenWalletError("");
+      return;
+    }
+    let cancelled = false;
+    setTokenWallet(null);
+    setTokenWalletError("");
+    tokenWalletSummary(token, wallet)
+      .then((data) => {
+        if (!cancelled) {
+          setTokenWallet(data);
+          setSelectedSymbol(data.symbol);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) setTokenWalletError(message(error));
+      });
+    return () => { cancelled = true; };
+  }, [token, wallet, marketVersion]);
   useEffect(() => {
     if (!token || !wallet) return;
     const controller = new AbortController();
