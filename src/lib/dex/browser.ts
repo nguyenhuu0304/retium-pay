@@ -1,4 +1,4 @@
-import { readPool } from "./pool-read";
+import { decodeContractData, readPool } from "./pool-read";
 // Public RPC reads supply review inputs; only independent backend reads can confirm settlement.
 import { publicRead } from "../rpc/public-read";
 import { DEX, atomic, decimalAtomic, type Pool } from "./math";
@@ -33,7 +33,7 @@ async function query(contract: string, method: string, args: string[] = []) {
 }
 export async function pools(cursor: string) {
   if (!/^[0-9]{1,12}$/.test(cursor)) throw Error("Invalid cursor.");
-  const data = JSON.parse(
+  const data = decodeContractData(
     await query(DEX, "list_pools", cursor === "0" ? [] : [cursor]),
   );
   const list = Array.isArray(data) ? data : data.pools;
