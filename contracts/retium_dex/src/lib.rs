@@ -94,7 +94,7 @@ fn sqrt(n: u128) -> u128 {
     if n < 2 { return n; }
     // Avoid n + 1 overflowing for u128::MAX.
     let mut x = n;
-    let mut y = x / 2 + 1;
+    let mut y = x / 2;
     while y < x {
         x = y;
         y = (x + n / x) / 2;
@@ -369,6 +369,8 @@ mod tests {
     fn square_root_is_floor_and_handles_edges() {
         assert_eq!(sqrt(0), 0);
         assert_eq!(sqrt(1), 1);
+        assert_eq!(sqrt(2), 1);
+        assert_eq!(sqrt(3), 1);
         assert_eq!(sqrt(15), 3);
         assert_eq!(sqrt(16), 4);
         assert_eq!(sqrt(17), 4);
