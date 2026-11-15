@@ -105,7 +105,11 @@ export function makePlan(input: {
   const p = i.pool,
     r = p ? atomic(p.reserve_rtm) : 0n,
     t = p ? atomic(p.reserve_token) : 0n,
-    supply = p ? atomic(p.lp_supply) : 0n;
+    supply = p ? atomic(p.lp_supply) : 0n,
+    effectiveLocked =
+      i.locked > 0n && (i.untilMs === -1 || i.now < i.untilMs)
+        ? i.locked
+        : 0n;
   let method = "",
     args: string[] = [],
     attached = 0n,
@@ -184,7 +188,7 @@ export function makePlan(input: {
   } else if (i.action === "remove") {
     if (!p || supply <= 0n) throw Error("Pool unavailable.");
     const shares = units(i.shares);
-    if (shares > i.lp - i.locked) throw Error("Not enough unlocked LP shares.");
+    if (shares > i.lp - effectiveLocked) throw Error("Not enough unlocked LP shares.");
     const mr = minimum((r * shares) / supply, b),
       mt = minimum((t * shares) / supply, b);
     if (mr <= 0n || mt <= 0n) throw Error("Withdrawal is too small.");
@@ -203,14 +207,14 @@ export function makePlan(input: {
   } else if (i.action === "lock") {
     const shares = units(i.shares),
       days = Number(i.lockDays);
-    if (shares > i.lp || shares < i.locked)
+    if (shares > i.lp || shares < effectiveLocked)
       throw Error(
-        "Lock total must be between current locked shares and total LP.",
+        "Lock total must be between active locked shares and total LP.",
       );
     if (!Number.isInteger(days) || days < 1 || days > 3650)
       throw Error("Choose a lock duration from 1 to 3650 days.");
     const until = i.now + days * 86400_000;
-    if (i.locked > 0n && (i.untilMs === 0 || until < i.untilMs))
+    if (effectiveLocked > 0n && (i.untilMs === -1 || until < i.untilMs))
       throw Error(
         "An active lock cannot be shortened; permanent locks cannot be replaced.",
       );
