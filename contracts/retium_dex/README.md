@@ -20,8 +20,8 @@ Token inputs use RCP-1 `transfer_from`; RTM input is attached to the signed call
 From the repository root:
 
 ```powershell
-cargo test --manifest-path contracts/retium_dex/Cargo.toml
-cargo build --release --target wasm32-unknown-unknown --manifest-path contracts/retium_dex/Cargo.toml
+cargo test --manifest-path contracts/retium_dex/Cargo.toml --target-dir target
+cargo build --release --target wasm32-unknown-unknown --manifest-path contracts/retium_dex/Cargo.toml --target-dir target
 ```
 
 Then inspect the exact artifact with:
