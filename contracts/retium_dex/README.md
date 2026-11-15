@@ -4,7 +4,6 @@ This is the first Rust implementation of the DEX contract expected by Retium Pay
 
 ## Methods exposed
 
-- `init()`
 - `list_pools([cursor])`
 - `get_pool(token_id)`
 - `get_lp_balance(token_id, wallet)`
@@ -36,7 +35,8 @@ Do not deploy or enable the DApp until tests pass, the dry-run passes, and the c
 ## Important implementation notes
 
 - Swap fee is 0.3%, matching the current Retium Pay quote model.
-- The contract uses chain block time for deadlines and LP locks.
+- The contract uses chain block time for deadlines and LP locks. Expired finite locks no longer block withdrawals; permanent locks remain locked.
 - Every cross-contract token transfer checks for an error reply and traps on refusal so the whole transaction rolls back.
 - The first 1,000 LP units are permanently excluded from user balances as minimum liquidity.
-- This first pass has not been run through Cargo or Retium dry-run yet. Treat it as review code, not deployable production code.
+- No initializer is required: the DEX has no privileged owner-only actions, avoiding a public first-caller initialization race.
+- This code has passed local Cargo test/build once, but the latest review changes still need a fresh local test/build and a Retium dry-run. Treat it as review code, not deployable production code.
