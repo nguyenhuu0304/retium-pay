@@ -79,6 +79,7 @@ export async function tokenInfo(token: string) {
       )
       ?.slice(7) || token.slice(0, 10);
   return {
+    name: typeof meta?.rcp_type === "string" && meta.rcp_type.trim() ? meta.rcp_type.trim() : "Unknown token",
     symbol:
       /^[A-Za-z0-9._-]{1,20}$/.test(symbol) && symbol !== "RTM"
         ? symbol
@@ -182,6 +183,7 @@ export async function marketSummary(token: string, wallet: string) {
   return {
     token,
     wallet,
+    name: m.info.name,
     symbol: m.info.symbol,
     codeHash: m.info.codeHash,
     pool: m.pool,
@@ -200,7 +202,7 @@ export async function reviewSnapshot(token: string, wallet: string) {
     throw Error("Select a token and connect a wallet.");
   const m = await market(token, wallet);
   return {
-    token, wallet, symbol: m.info.symbol, codeHash: m.info.codeHash,
+    token, wallet, name: m.info.name, symbol: m.info.symbol, codeHash: m.info.codeHash,
     pool: m.pool, balanceRtm: m.balanceRtm.toString(),
     balanceToken: m.balanceToken.toString(), allowance: m.allowance.toString(),
     lp: m.lp.toString(), locked: m.locked.toString(), untilMs: m.untilMs,
