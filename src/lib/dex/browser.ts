@@ -168,6 +168,13 @@ export async function tokenPage(cursor: string, offset: number) {
         : null;
   return { tokens, next };
 }
+export async function walletRtmBalance(wallet: string) {
+  if (!/^rete[0-9a-f]{68}$/.test(wallet))
+    throw Error("Invalid wallet address.");
+  const account = await rpcRead(`wallet/${wallet}`);
+  return decimalAtomic(account.spendable ?? account.balance_rtm).toString();
+}
+
 export async function marketSummary(token: string, wallet: string) {
   if (!/^[0-9a-f]{64}$/.test(token) || !/^rete[0-9a-f]{68}$/.test(wallet))
     throw Error("Select a token and connect a wallet.");
