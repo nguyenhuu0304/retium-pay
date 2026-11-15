@@ -266,7 +266,15 @@ fn remove_liquidity(c: &Call) -> Reply {
     let key = lp_key(token, c.caller());
     let balance = storage::get_u128(&key)?;
     let locked = storage::get_u128(&lock_key(token, c.caller()))?;
-    if shares > balance.saturating_sub(locked) { return error("not enough unlocked LP shares"); }
+    let until = storage::get_or(&format!("until:{token}:{}", c.caller()), "0")?
+        .parse::<i64>()
+        .map_err(|_| "corrupt lock state")?;
+    let effective_locked = if locked > 0 && (until == -1 || env::block_time_ms() < until) {
+        locked
+    } else {
+        0
+    };
+    if shares > balance.saturating_sub(effective_locked) { return error("not enough unlocked LP shares"); }
     let out_rtm = mul_div(p.reserve_rtm, shares, p.lp_supply)?;
     let out_token = mul_div(p.reserve_token, shares, p.lp_supply)?;
     if out_rtm < min_rtm || out_token < min_token || out_rtm == 0 || out_token == 0 { return error("minimum withdrawal not met"); }
@@ -304,13 +312,14 @@ fn lock_liquidity(c: &Call) -> Reply {
         .map_err(|_| "corrupt lock state")?;
     let now = env::block_time_ms();
 
-    if total > balance || total < old_locked {
+    let active_lock = old_locked > 0 && (old_until == -1 || now < old_until);
+    if total > balance || (active_lock && total < old_locked) {
         return error("locked LP total must be between existing lock and LP balance");
     }
 
-    // An expired finite lock can be cleared. Active and permanent locks cannot.
+    // An expired finite lock can be cleared or replaced. Active and permanent locks cannot.
     if total == 0 {
-        if old_locked > 0 && (old_until == -1 || now < old_until) {
+        if active_lock {
             return error("an active or permanent LP lock cannot be released");
         }
         storage::set_u128(&lock_key, 0)?;
@@ -327,7 +336,7 @@ fn lock_liquidity(c: &Call) -> Reply {
     if until != -1 && (until <= now || until > now.saturating_add(3650_i64 * 86_400_000)) {
         return error("lock must be between now and ten years, or -1 for permanent");
     }
-    if old_locked > 0 && (old_until == -1 || (until != -1 && until < old_until)) {
+    if active_lock && (old_until == -1 || (until != -1 && until < old_until)) {
         return error("an active LP lock cannot be shortened");
     }
 
