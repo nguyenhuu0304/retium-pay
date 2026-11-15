@@ -12,7 +12,7 @@ import {
 } from "../../components/shared-wallet";
 import { assessFunding } from "../../lib/dex/funding";
 import { walletRequest } from "../../lib/wallet/adapter";
-import { tokenPage, marketSummary, reviewSnapshot } from "../../lib/dex/browser";
+import { tokenPage, marketSummary, reviewSnapshot, walletRtmBalance } from "../../lib/dex/browser";
 import "./dex.css";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -138,7 +138,23 @@ export default function DexPage() {
     [selectedSymbol, setSelectedSymbol] = useState(""),
     [marketData, setMarketData] = useState<Market | null>(null),
     [marketLoading, setMarketLoading] = useState(false),
-    [marketError, setMarketError] = useState("");
+    [marketError, setMarketError] = useState(""),
+    [walletRtm, setWalletRtm] = useState("—");
+  useEffect(() => {
+    let cancelled = false;
+    if (!wallet) {
+      setWalletRtm("—");
+      return;
+    }
+    walletRtmBalance(wallet)
+      .then((balance) => {
+        if (!cancelled) setWalletRtm(displayAmount(BigInt(balance)));
+      })
+      .catch(() => {
+        if (!cancelled) setWalletRtm("Unavailable");
+      });
+    return () => { cancelled = true; };
+  }, [wallet, marketVersion]);
   useEffect(() => {
     if (!token || !wallet) return;
     const controller = new AbortController();
@@ -559,11 +575,11 @@ export default function DexPage() {
   }
   const paySymbol = inputRtm ? "RTM" : symbol,
     receiveSymbol = inputRtm ? symbol : "RTM";
-  const payBalance = activeMarket
-    ? displayAmount(
-        BigInt(inputRtm ? activeMarket.balanceRtm : activeMarket.balanceToken),
-      )
-    : "—";
+  const payBalance = inputRtm
+    ? walletRtm
+    : activeMarket
+      ? displayAmount(BigInt(activeMarket.balanceToken))
+      : "—";
   function chooseAmount(kind: "input" | "token" | "lp", percent: number) {
     if (!activeMarket || blocked) return;
     let available = 0n;
