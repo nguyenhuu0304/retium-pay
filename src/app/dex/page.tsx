@@ -12,7 +12,7 @@ import {
 } from "../../components/shared-wallet";
 import { assessFunding } from "../../lib/dex/funding";
 import { walletRequest } from "../../lib/wallet/adapter";
-import { tokenPage, marketSummary, reviewSnapshot, walletRtmBalance } from "../../lib/dex/browser";
+import { tokenPage, marketSummary, reviewSnapshot, walletRtmBalance, tokenWalletSummary } from "../../lib/dex/browser";
 import "./dex.css";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -133,7 +133,7 @@ export default function DexPage() {
     [confirmed, setConfirmed] = useState(false),
     [clock, setClock] = useState(0);
   const [backgroundTxs, setBackgroundTxs] = useState<Recovery[]>([]);
-  const [marketVersion, setMarketVersion] = useState(0);
+  const [marketVersion, setMarketVersion] = useState(0);\n  const [tokenWallet, setTokenWallet] = useState<{name:string;symbol:string;decimals:number;balance:string;codeHash:string}|null>(null);\n  const [tokenWalletError, setTokenWalletError] = useState("");
   const [picker, setPicker] = useState(false),
     [filter, setFilter] = useState(""),
     [selectedSymbol, setSelectedSymbol] = useState(""),
@@ -782,7 +782,7 @@ export default function DexPage() {
                 <span>{<UiText text={"To"} />}</span>
                 <span>
                   {<UiText text={"Balance: "} />}
-                  {inputRtm && activeMarket ? displayAmount(BigInt(activeMarket.balanceToken)) : walletRtm}
+                  {inputRtm ? (tokenWallet?.balance ?? "—") : walletRtm}
                 </span>
               </div>
               <div className="asset-line">
@@ -840,7 +840,7 @@ export default function DexPage() {
             )}
           </>
         )}
-        {marketError && <p className="inline-error">{marketError}</p>}
+        {tokenWallet && <div className="position-info"><span><b>{tokenWallet.name} ({tokenWallet.symbol})</b></span><span>{tokenWallet.symbol} balance <b>{tokenWallet.balance}</b></span><small className="dex-code">{short(token)}</small></div>}\n        {tokenWalletError && <p className="inline-error">{tokenWalletError}</p>}\n        {marketError && <p className="inline-error">{marketError}</p>}
         {activeMarket && (
           <div className="position-info">
             <span>
