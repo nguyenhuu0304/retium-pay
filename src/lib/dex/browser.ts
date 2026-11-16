@@ -205,6 +205,38 @@ export async function walletRtmBalance(wallet: string) {
   return decimalAtomic(account.balance_rtm).toString();
 }
 
+export async function walletTokens(wallet: string) {
+  if (!/^rete[0-9a-f]{68}$/.test(wallet))
+    throw Error("Connect a valid Retium wallet to load its tokens.");
+  const data = await rpcRead(`wallet/${wallet}/tokens`);
+  const rows: unknown[] = Array.isArray(data.tokens) ? data.tokens : [];
+  const unique = new Map<string, { token: string; symbol: string }>();
+  for (const value of rows) {
+    if (!value || typeof value !== "object") continue;
+    const row = value as Record<string, unknown>;
+    const token = typeof row.contract_id === "string" ? row.contract_id.toLowerCase() : "";
+    if (!/^[0-9a-f]{64}$/.test(token)) continue;
+    const rawSymbol = typeof row.symbol === "string" ? row.symbol.trim() : "";
+    const symbol = /^[A-Za-z0-9._-]{1,20}$/.test(rawSymbol) ? rawSymbol : `Token ${token.slice(0, 8)}`;
+    unique.set(token, { token, symbol });
+  }
+  const entries = [...unique.values()];
+  const results: { token: string; symbol: string; supported: boolean }[] = [];
+  for (let start = 0; start < entries.length; start += 4) {
+    const batch = entries.slice(start, start + 4);
+    const checked = await Promise.allSettled(batch.map(async (item) => {
+      const info = await tokenInfo(item.token);
+      return { token: item.token, symbol: info.symbol, supported: true };
+    }));
+    checked.forEach((result, index) => {
+      results.push(result.status === "fulfilled"
+        ? result.value
+        : { token: batch[index].token, symbol: batch[index].symbol, supported: false });
+    });
+  }
+  return results;
+}
+
 export async function marketSummary(token: string, wallet: string) {
   if (!/^[0-9a-f]{64}$/.test(token) || !/^rete[0-9a-f]{68}$/.test(wallet))
     throw Error("Select a token and connect a wallet.");
