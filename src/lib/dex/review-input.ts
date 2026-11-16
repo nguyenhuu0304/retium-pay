@@ -9,7 +9,14 @@ export function parseReviewSnapshot(value: unknown, token: string, wallet: strin
     throw Error("Review data expired. Refresh and try again.");
   if (typeof s.nonce !== "number" || !Number.isSafeInteger(s.nonce) || s.nonce < 0)
     throw Error("Invalid review nonce.");
-  if (typeof s.symbol !== "string" || !/^[A-Za-z0-9._ -]{1,40}$/.test(s.symbol) || typeof s.codeHash !== "string" || !/^[0-9a-f]{64}$/.test(s.codeHash))
+  if (
+    typeof s.name !== "string" ||
+    !/^[A-Za-z0-9._ -]{1,48}$/.test(s.name) ||
+    typeof s.symbol !== "string" ||
+    !/^[A-Za-z0-9._ -]{1,40}$/.test(s.symbol) ||
+    typeof s.codeHash !== "string" ||
+    !/^[0-9a-f]{64}$/.test(s.codeHash)
+  )
     throw Error("Invalid token metadata.");
   let pool: Pool | null = null;
   if (s.pool !== null) {
@@ -21,7 +28,7 @@ export function parseReviewSnapshot(value: unknown, token: string, wallet: strin
   const lp = atomic(s.lp), locked = atomic(s.locked);
   if (typeof s.untilMs !== "number" || !Number.isSafeInteger(s.untilMs) || s.untilMs < -1 || locked > lp || (locked > 0n && s.untilMs < 0))
     throw Error("Invalid LP lock state.");
-  return { info: { symbol: s.symbol, codeHash: s.codeHash }, pool,
+  return { info: { name: s.name, symbol: s.symbol, codeHash: s.codeHash }, pool,
     balanceRtm: atomic(s.balanceRtm), balanceToken: atomic(s.balanceToken), allowance: atomic(s.allowance),
     lp, locked, untilMs: s.untilMs, nonce: s.nonce };
 }

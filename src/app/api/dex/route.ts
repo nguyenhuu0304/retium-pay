@@ -12,6 +12,33 @@ import {
   marketSummary,
 } from "../../../lib/dex/server";
 import { assertFeatureReady } from "../../../lib/network/health";
+
+function allowedRequestOrigins(): Set<string> {
+  const origins = new Set<string>();
+  const candidates = [
+    process.env.APP_URL,
+    process.env.NEXT_PUBLIC_APP_URL,
+    process.env.VERCEL_URL,
+    process.env.VERCEL_BRANCH_URL,
+  ];
+
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    try {
+      const url = new URL(
+        candidate.includes("://") ? candidate : `https://${candidate}`,
+      );
+      if (url.protocol === "https:" || url.hostname === "localhost")
+        origins.add(url.origin);
+    } catch {
+      // Ignore malformed optional deployment URL values.
+    }
+  }
+
+  if (!process.env.VERCEL) origins.add("http://localhost:3000");
+  return origins;
+}
+
 export async function GET(request: Request) {
   try {
     const u = new URL(request.url);
@@ -51,16 +78,16 @@ export async function GET(request: Request) {
     );
   }
 }
+
 export async function POST(request: Request) {
   try {
-    if (
-      request.headers.get("origin") !==
-      new URL(process.env.APP_URL || "http://localhost:3000").origin
-    )
+    const origin = request.headers.get("origin");
+    if (!origin || !allowedRequestOrigins().has(origin))
       return NextResponse.json(
         { error: "Request origin is not allowed." },
         { status: 403 },
       );
+
     const text = await request.text();
     if (text.length > 15000) throw Error("Request too large.");
     const body = JSON.parse(text);
@@ -70,15 +97,15 @@ export async function POST(request: Request) {
       const ticket = String(body.ticket || "");
       const plan = await trackingPlan(ticket);
       const address = await identity(request);
-      if(address !== plan.wallet) throw Error("Wallet session does not own this preview.");
+      if (address !== plan.wallet) throw Error("Wallet session does not own this preview.");
       const txId = String(body.txId || "");
-      if(!/^tx_[a-f0-9]{32}$/.test(txId)) throw Error("Invalid transaction ID.");
+      if (!/^tx_[a-f0-9]{32}$/.test(txId)) throw Error("Invalid transaction ID.");
       const result = body.operation === "register"
         ? await register(ticket, txId, plan.wallet)
         : await job(txId, plan.wallet);
       // A ticket is a capability only for its exact immutable plan, never another wallet's job.
       if (JSON.stringify(result.plan) !== JSON.stringify(plan)) throw Error("Ticket does not authorize this transaction.");
-      return NextResponse.json({job: result}, {headers: {"Cache-Control":"no-store"}});
+      return NextResponse.json({ job: result }, { headers: { "Cache-Control": "no-store" } });
     }
     if (body.operation === "prepareDeploy")
       return NextResponse.json(await prepareDeploy(body), {
@@ -99,4 +126,3 @@ export async function POST(request: Request) {
 }
 
 export const maxDuration = 60;
-

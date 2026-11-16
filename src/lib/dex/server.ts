@@ -2,7 +2,7 @@ import { verifyDexTx } from "../transactions/verify";
 import { rpcGet } from "../rpc/client";
 import { assertFeatureReady } from "../network/health";
 export { verifyDexTx } from "../transactions/verify";
-import { readPool } from "./pool-read";
+import { decodeContractData, readPool } from "./pool-read";
 import { parseReviewSnapshot, parseDeploymentAccount } from "./review-input";
 import { blake3 } from "@noble/hashes/blake3.js";
 import {
@@ -48,7 +48,7 @@ async function query(contract: string, method: string, args: string[] = []) {
 }
 export async function pools(cursor: string) {
   if (!/^[0-9]{1,12}$/.test(cursor)) throw Error("Invalid cursor.");
-  const data = JSON.parse(
+  const data = decodeContractData(
     await query(DEX, "list_pools", cursor === "0" ? [] : [cursor]),
   );
   const list = Array.isArray(data) ? data : data.pools;
@@ -94,6 +94,7 @@ export async function tokenInfo(token: string) {
       )
       ?.slice(7) || token.slice(0, 10);
   return {
+    name: typeof meta?.rcp_type === "string" && meta.rcp_type.trim() ? meta.rcp_type.trim() : "Unknown token",
     symbol:
       /^[A-Za-z0-9._-]{1,20}$/.test(symbol) && symbol !== "RTM"
         ? symbol
@@ -108,7 +109,7 @@ export async function market(token: string, wallet: string) {
   const balanceToken = atomic(await query(token, "balance_of", [wallet]));
   const allowance = atomic(await query(token, "allowance", [wallet, DEX]));
   const position = pool
-    ? JSON.parse(await query(DEX, "get_lp_balance", [token, wallet]))
+    ? decodeContractData(await query(DEX, "get_lp_balance", [token, wallet]))
     : { lp_balance: "0", locked: "0", until_ms: 0 };
   const lp = atomic(position.lp_balance),
     locked = atomic(position.locked);
@@ -177,6 +178,7 @@ export async function prepare(body: Record<string, unknown>) {
     plan,
     ticket: `${payload}.${sig}`,
     market: {
+      name: m.info.name,
       symbol: m.info.symbol,
       codeHash: m.info.codeHash,
       pool: m.pool,

@@ -1,4 +1,4 @@
-import { readPool } from "./pool-read";
+import { decodeContractData, readPool } from "./pool-read";
 // Public RPC reads supply review inputs; only independent backend reads can confirm settlement.
 import { publicRead } from "../rpc/public-read";
 import { DEX, atomic, decimalAtomic, type Pool } from "./math";
@@ -33,7 +33,7 @@ async function query(contract: string, method: string, args: string[] = []) {
 }
 export async function pools(cursor: string) {
   if (!/^[0-9]{1,12}$/.test(cursor)) throw Error("Invalid cursor.");
-  const data = JSON.parse(
+  const data = decodeContractData(
     await query(DEX, "list_pools", cursor === "0" ? [] : [cursor]),
   );
   const list = Array.isArray(data) ? data : data.pools;
@@ -79,11 +79,41 @@ export async function tokenInfo(token: string) {
       )
       ?.slice(7) || token.slice(0, 10);
   return {
+    name: typeof meta?.rcp_type === "string" && meta.rcp_type.trim() ? meta.rcp_type.trim() : "Unknown token",
     symbol:
       /^[A-Za-z0-9._-]{1,20}$/.test(symbol) && symbol !== "RTM"
         ? symbol
         : `Token ${token.slice(0, 10)}`,
     codeHash: data.code_hash,
+  };
+}
+
+export async function tokenWalletSummary(token: string, wallet: string) {
+  if (!/^[0-9a-f]{64}$/.test(token) || !/^rete[0-9a-f]{68}$/.test(wallet))
+    throw Error("Enter a valid token contract and connect a Retium wallet.");
+  const data = await rpcRead(`contract/${token}`);
+  if (data.contract_id !== token) throw Error("Wrong token returned by RPC.");
+  const meta = data.rcp_metadata || {};
+  const traits: unknown[] = Array.isArray(meta.traits) ? meta.traits : [];
+  const caps: unknown[] = Array.isArray(meta.capabilities) ? meta.capabilities : [];
+  if (!traits.includes("fungible") || !caps.includes("balance_of"))
+    throw Error("This contract does not expose a fungible-token balance.");
+  const symbol = traits.find((x): x is string => typeof x === "string" && x.startsWith("symbol:"))?.slice(7) || token.slice(0, 10);
+  const decimalsTrait = traits.find((x): x is string => typeof x === "string" && x.startsWith("decimals:"));
+  const decimals = decimalsTrait ? Number(decimalsTrait.slice(9)) : Number(meta.decimals ?? 18);
+  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 36)
+    throw Error("Token declares an unsupported decimal precision.");
+  const raw = atomic(await query(token, "balance_of", [wallet]));
+  const scale = 10n ** BigInt(decimals);
+  const whole = raw / scale;
+  const fraction = raw % scale;
+  const balance = decimals === 0 ? whole.toString() : `${whole}.${fraction.toString().padStart(decimals, "0").replace(/0+$/, "") || "0"}`;
+  return {
+    name: typeof meta.rcp_type === "string" && meta.rcp_type.trim() ? meta.rcp_type.trim() : "Unknown token",
+    symbol: /^[A-Za-z0-9._-]{1,20}$/.test(symbol) ? symbol : token.slice(0, 10),
+    decimals,
+    balance,
+    codeHash: String(data.code_hash || ""),
   };
 }
 export async function market(token: string, wallet: string) {
@@ -93,7 +123,7 @@ export async function market(token: string, wallet: string) {
   const balanceToken = atomic(await query(token, "balance_of", [wallet]));
   const allowance = atomic(await query(token, "allowance", [wallet, DEX]));
   const position = pool
-    ? JSON.parse(await query(DEX, "get_lp_balance", [token, wallet]))
+    ? decodeContractData(await query(DEX, "get_lp_balance", [token, wallet]))
     : { lp_balance: "0", locked: "0", until_ms: 0 };
   const lp = atomic(position.lp_balance),
     locked = atomic(position.locked);
@@ -109,7 +139,7 @@ export async function market(token: string, wallet: string) {
   if (!Number.isSafeInteger(nonce) || nonce < 0)
     throw Error("RPC did not return a usable wallet nonce.");
   // spendable and balance_rtm are decimal RTM in the current wallet API.
-  const balanceRtm = decimalAtomic(account.spendable ?? account.balance_rtm);
+  const balanceRtm = decimalAtomic(account.balance_rtm);
   return {
     info,
     pool,
@@ -168,6 +198,45 @@ export async function tokenPage(cursor: string, offset: number) {
         : null;
   return { tokens, next };
 }
+export async function walletRtmBalance(wallet: string) {
+  if (!/^rete[0-9a-f]{68}$/.test(wallet))
+    throw Error("Invalid wallet address.");
+  const account = await rpcRead(`wallet/${wallet}`);
+  return decimalAtomic(account.balance_rtm).toString();
+}
+
+export async function walletTokens(wallet: string) {
+  if (!/^rete[0-9a-f]{68}$/.test(wallet))
+    throw Error("Connect a valid Retium wallet to load its tokens.");
+  const data = await rpcRead(`wallet/${wallet}/tokens`);
+  const rows: unknown[] = Array.isArray(data.tokens) ? data.tokens : [];
+  const unique = new Map<string, { token: string; symbol: string }>();
+  for (const value of rows) {
+    if (!value || typeof value !== "object") continue;
+    const row = value as Record<string, unknown>;
+    const token = typeof row.contract_id === "string" ? row.contract_id.toLowerCase() : "";
+    if (!/^[0-9a-f]{64}$/.test(token)) continue;
+    const rawSymbol = typeof row.symbol === "string" ? row.symbol.trim() : "";
+    const symbol = /^[A-Za-z0-9._-]{1,20}$/.test(rawSymbol) ? rawSymbol : `Token ${token.slice(0, 8)}`;
+    unique.set(token, { token, symbol });
+  }
+  const entries = [...unique.values()];
+  const results: { token: string; symbol: string; supported: boolean }[] = [];
+  for (let start = 0; start < entries.length; start += 4) {
+    const batch = entries.slice(start, start + 4);
+    const checked = await Promise.allSettled(batch.map(async (item) => {
+      const info = await tokenInfo(item.token);
+      return { token: item.token, symbol: info.symbol, supported: true };
+    }));
+    checked.forEach((result, index) => {
+      results.push(result.status === "fulfilled"
+        ? result.value
+        : { token: batch[index].token, symbol: batch[index].symbol, supported: false });
+    });
+  }
+  return results;
+}
+
 export async function marketSummary(token: string, wallet: string) {
   if (!/^[0-9a-f]{64}$/.test(token) || !/^rete[0-9a-f]{68}$/.test(wallet))
     throw Error("Select a token and connect a wallet.");
@@ -175,6 +244,7 @@ export async function marketSummary(token: string, wallet: string) {
   return {
     token,
     wallet,
+    name: m.info.name,
     symbol: m.info.symbol,
     codeHash: m.info.codeHash,
     pool: m.pool,
@@ -193,7 +263,7 @@ export async function reviewSnapshot(token: string, wallet: string) {
     throw Error("Select a token and connect a wallet.");
   const m = await market(token, wallet);
   return {
-    token, wallet, symbol: m.info.symbol, codeHash: m.info.codeHash,
+    token, wallet, name: m.info.name, symbol: m.info.symbol, codeHash: m.info.codeHash,
     pool: m.pool, balanceRtm: m.balanceRtm.toString(),
     balanceToken: m.balanceToken.toString(), allowance: m.allowance.toString(),
     lp: m.lp.toString(), locked: m.locked.toString(), untilMs: m.untilMs,

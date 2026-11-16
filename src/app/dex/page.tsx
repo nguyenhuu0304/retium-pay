@@ -12,7 +12,7 @@ import {
 } from "../../components/shared-wallet";
 import { assessFunding } from "../../lib/dex/funding";
 import { walletRequest } from "../../lib/wallet/adapter";
-import { tokenPage, marketSummary, reviewSnapshot } from "../../lib/dex/browser";
+import { tokenPage, marketSummary, reviewSnapshot, walletRtmBalance, tokenWalletSummary, walletTokens } from "../../lib/dex/browser";
 import "./dex.css";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -29,6 +29,7 @@ type Preview = {
   plan: Plan;
   ticket: string;
   market: {
+    name: string;
     symbol: string;
     pool: Pool | null;
     lp: string;
@@ -133,12 +134,51 @@ export default function DexPage() {
     [clock, setClock] = useState(0);
   const [backgroundTxs, setBackgroundTxs] = useState<Recovery[]>([]);
   const [marketVersion, setMarketVersion] = useState(0);
+  const [tokenWallet, setTokenWallet] = useState<{name:string;symbol:string;decimals:number;balance:string;codeHash:string}|null>(null);
+  const [tokenWalletError, setTokenWalletError] = useState("");
   const [picker, setPicker] = useState(false),
     [filter, setFilter] = useState(""),
     [selectedSymbol, setSelectedSymbol] = useState(""),
     [marketData, setMarketData] = useState<Market | null>(null),
     [marketLoading, setMarketLoading] = useState(false),
-    [marketError, setMarketError] = useState("");
+    [marketError, setMarketError] = useState(""),
+    [walletRtm, setWalletRtm] = useState("—");
+  useEffect(() => {
+    let cancelled = false;
+    if (!wallet) {
+      setWalletRtm("—");
+      return;
+    }
+    walletRtmBalance(wallet)
+      .then((balance) => {
+        if (!cancelled) setWalletRtm(displayAmount(BigInt(balance)));
+      })
+      .catch(() => {
+        if (!cancelled) setWalletRtm("Unavailable");
+      });
+    return () => { cancelled = true; };
+  }, [wallet, marketVersion]);
+  useEffect(() => {
+    if (!token || !wallet) {
+      setTokenWallet(null);
+      setTokenWalletError("");
+      return;
+    }
+    let cancelled = false;
+    setTokenWallet(null);
+    setTokenWalletError("");
+    tokenWalletSummary(token, wallet)
+      .then((data) => {
+        if (!cancelled) {
+          setTokenWallet(data);
+          setSelectedSymbol(data.symbol);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) setTokenWalletError(message(error));
+      });
+    return () => { cancelled = true; };
+  }, [token, wallet, marketVersion]);
   useEffect(() => {
     if (!token || !wallet) return;
     const controller = new AbortController();
@@ -281,6 +321,17 @@ export default function DexPage() {
     setPreview(null);
     setConfirmed(false);
   };
+  async function loadWalletTokens() {
+    if (!wallet) return;
+    try {
+      const tokens = await walletTokens(wallet);
+      setPoolList((old) => [
+        ...new Map([...old, ...tokens].map((item) => [item.token, item])).values(),
+      ]);
+    } catch (e) {
+      setNotice(`Wallet token list unavailable: ${message(e)}`);
+    }
+  }
   async function loadPools() {
     if (busy || cursor === null) return;
     setBusy(true);
@@ -302,6 +353,7 @@ export default function DexPage() {
   function openPicker() {
     setPicker(true);
     setFilter("");
+    if (wallet) void loadWalletTokens();
     if (poolList.length === 0) void loadPools();
   }
   function selectToken(item: PickerToken) {
@@ -559,11 +611,11 @@ export default function DexPage() {
   }
   const paySymbol = inputRtm ? "RTM" : symbol,
     receiveSymbol = inputRtm ? symbol : "RTM";
-  const payBalance = activeMarket
-    ? displayAmount(
-        BigInt(inputRtm ? activeMarket.balanceRtm : activeMarket.balanceToken),
-      )
-    : "—";
+  const payBalance = inputRtm
+    ? walletRtm
+    : activeMarket
+      ? displayAmount(BigInt(activeMarket.balanceToken))
+      : "—";
   function chooseAmount(kind: "input" | "token" | "lp", percent: number) {
     if (!activeMarket || blocked) return;
     let available = 0n;
@@ -763,7 +815,10 @@ export default function DexPage() {
             <div className="asset-box">
               <div className="asset-caption">
                 <span>{<UiText text={"To"} />}</span>
-                <span>{<UiText text={"Estimated"} />}</span>
+                <span>
+                  {<UiText text={"Balance: "} />}
+                  {inputRtm ? (tokenWallet?.balance ?? "—") : walletRtm}
+                </span>
               </div>
               <div className="asset-line">
                 <button
@@ -820,9 +875,12 @@ export default function DexPage() {
             )}
           </>
         )}
-        {marketError && <p className="inline-error">{marketError}</p>}
-        {action !== "swap" && activeMarket && (
+        {tokenWallet && <div className="position-info"><span><b>{tokenWallet.name} ({tokenWallet.symbol})</b></span><span>{tokenWallet.symbol} balance <b>{tokenWallet.balance}</b></span><small className="dex-code">{short(token)}</small></div>}\n        {tokenWalletError && <p className="inline-error">{tokenWalletError}</p>}\n        {marketError && <p className="inline-error">{marketError}</p>}
+        {activeMarket && (
           <div className="position-info">
+            <span>
+              <b>{activeMarket.name} ({symbol})</b>
+            </span>
             <span>
               {<UiText text={"Available RTM"} />}{" "}
               <b>{displayAmount(BigInt(activeMarket.balanceRtm))}</b>
@@ -1356,7 +1414,7 @@ export default function DexPage() {
               {
                 <UiText
                   text={
-                    "Tokens available in Retium Pay. Match the contract as well as the name."
+                    "Wallet-held Retium tokens and tokens with existing pools. Tokens without a supported DEX interface are shown disabled."
                   }
                 />
               }
