@@ -12,7 +12,7 @@ import {
 } from "../../components/shared-wallet";
 import { assessFunding } from "../../lib/dex/funding";
 import { walletRequest } from "../../lib/wallet/adapter";
-import { tokenPage, marketSummary, reviewSnapshot, walletRtmBalance, tokenWalletSummary } from "../../lib/dex/browser";
+import { tokenPage, marketSummary, reviewSnapshot, walletRtmBalance, tokenWalletSummary, walletTokens } from "../../lib/dex/browser";
 import "./dex.css";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -321,6 +321,17 @@ export default function DexPage() {
     setPreview(null);
     setConfirmed(false);
   };
+  async function loadWalletTokens() {
+    if (!wallet) return;
+    try {
+      const tokens = await walletTokens(wallet);
+      setPoolList((old) => [
+        ...new Map([...old, ...tokens].map((item) => [item.token, item])).values(),
+      ]);
+    } catch (e) {
+      setNotice(`Wallet token list unavailable: ${message(e)}`);
+    }
+  }
   async function loadPools() {
     if (busy || cursor === null) return;
     setBusy(true);
@@ -342,6 +353,7 @@ export default function DexPage() {
   function openPicker() {
     setPicker(true);
     setFilter("");
+    if (wallet) void loadWalletTokens();
     if (poolList.length === 0) void loadPools();
   }
   function selectToken(item: PickerToken) {
@@ -1402,7 +1414,7 @@ export default function DexPage() {
               {
                 <UiText
                   text={
-                    "Tokens available in Retium Pay. Match the contract as well as the name."
+                    "Wallet-held Retium tokens and tokens with existing pools. Tokens without a supported DEX interface are shown disabled."
                   }
                 />
               }
