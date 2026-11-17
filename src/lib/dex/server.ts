@@ -39,6 +39,8 @@ async function query(contract: string, method: string, args: string[] = []) {
   // The current node treats commas as argument separators before URL decoding.
   // Restrict each value to plain IDs/names/numbers, then preserve literal commas.
   const plain = /^[0-9A-Za-z_]+$/;
+  if (contract === DEX && !DEX)
+    throw Error("The Retium DEX contract is not configured for this deployment.");
   if (
     !/^[0-9a-f]{64}$/.test(contract) ||
     !plain.test(method) ||
