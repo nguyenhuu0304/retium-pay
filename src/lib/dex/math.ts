@@ -97,11 +97,11 @@ export function makePlan(input: {
   nonce: number;
   now: number;
 }): Plan {
-  const i = input,
+  const i = input;
+  const b = i.bps;
   if (["add", "remove", "lock"].includes(i.action)) {
-    throw Error("This Whisk DexCore deployment does not advertise LP add/remove/lock methods. These actions are disabled until the exact supported contract interface is verified.");
+    throw Error("Whisk DexCore metadata does not advertise the legacy LP add/remove/lock methods. These actions remain disabled until a supported liquidity interface is verified.");
   }
-    b = i.bps;
   if (!Number.isInteger(b) || b < 10 || b > 500)
     throw Error("Slippage must be between 0.10% and 5.00%.");
   const deadline = i.now + 20 * 60_000;
