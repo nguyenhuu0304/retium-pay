@@ -20,6 +20,8 @@ import {
   fmt,
   units,
   output,
+  poolOutput,
+  poolFeeBps,
   minimum,
   UNIT,
   type Plan,
@@ -568,11 +570,7 @@ export default function DexPage() {
   if (action === "swap" && activeMarket?.pool) {
     try {
       const pool = activeMarket.pool;
-      const result = output(
-        units(amount),
-        BigInt(inputRtm ? pool.reserve_rtm : pool.reserve_token),
-        BigInt(inputRtm ? pool.reserve_token : pool.reserve_rtm),
-      );
+      const result = poolOutput(pool, units(amount), inputRtm);
       const bps = Math.round(Number(slip) * 100);
       if (bps >= 10 && bps <= 500) {
         estimate = displayAmount(result);
@@ -1130,7 +1128,12 @@ export default function DexPage() {
         </details>
         {action === "swap" && (
           <p className="dex-muted">
-            {<UiText text={"Pool fee 0.3%. The network fee is separate."} />}
+            {<UiText text={`Pool fee ${activeMarket?.pool ? poolFeeBps(activeMarket.pool) / 100 : 0.3}%. The network fee is separate.`} />}
+          </p>
+        )}
+        {activeMarket?.pool?.source === "whisk" && (
+          <p className="dex-muted" role="status">
+            {<UiText text={activeMarket.pool.kind === "v2" ? "Whisk Launch Market V2 · 1% fee. Swaps use existing Whisk liquidity; Retium Pay LP management is not available for this market." : "Whisk pool · 0.3% fee. Swaps use existing Whisk liquidity; Retium Pay LP management is not available for this pool."} />}
           </p>
         )}
         {activeMarket && !activeMarket.pool && action !== "create" && (
@@ -1143,7 +1146,7 @@ export default function DexPage() {
         )}
         <button
           className="primary-action"
-          disabled={blocked || !wallet || !!funding?.insufficient}
+          disabled={blocked || !wallet || !!funding?.insufficient || (!!activeMarket?.pool && activeMarket.pool.source === "whisk" && action !== "swap") || (!!activeMarket?.pool && action === "create")}
           onClick={primaryAction}
         >
           {<UiText text={primaryLabel} />}
