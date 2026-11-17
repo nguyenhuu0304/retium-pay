@@ -17,7 +17,7 @@ type Shared = {
   disconnect: () => Promise<void>;
 };
 const Context = createContext<Shared | null>(null);
-const storage = "retium-pay:shared-wallet:v1";
+const storage = "retiump4y:shared-wallet:v1";
 export function SharedWalletProvider({
   children,
 }: {
@@ -103,7 +103,7 @@ export function SharedWalletProvider({
         /* In-memory connection still works. */
       }
       setNotice(
-        "Wallet selected. Use it across Retium Pay; each signature still needs your approval.",
+        "Wallet selected. Use it across RetiumP4y; each signature still needs your approval.",
       );
     } catch (e) {
       setNotice(
@@ -129,7 +129,7 @@ export function SharedWalletProvider({
       setAccount(null);
       setRemembered(false);
       setNotice(
-        "Disconnected from Retium Pay. Existing submitted transactions remain tracked.",
+        "Disconnected from RetiumP4y. Existing submitted transactions remain tracked.",
       );
     } catch (e) {
       setNotice(e instanceof Error ? e.message : "Disconnect failed.");
@@ -143,8 +143,8 @@ export function SharedWalletProvider({
       value={{ account, ready, busy, notice, remembered, connect, disconnect }}
     >
       <Script
-        src="https://wallet.retium.org/connect/sdk/retium-sdk-1.3.0.js"
-        integrity="sha384-FTG6s31+cSLKvZXfREum814s/L2AnqVyikuFQvMKIvFfAz40ksTcaXVbRmkHGGTU"
+        src="https://wallet.retium.org/connect/sdk/retium-sdk-1.5.0.js"
+        integrity="sha384-IZZw04xxx1GLXviLZ7lw+B5XTi4SNw7Y6fUYf2zdJ8b54pBxVv5KqdvLSjQhZL3v"
         crossOrigin="anonymous"
         strategy="afterInteractive"
         onError={() =>
