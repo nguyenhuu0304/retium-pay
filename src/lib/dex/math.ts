@@ -7,6 +7,8 @@ export type Pool = {
   reserve_rtm: string;
   reserve_token: string;
   lp_supply: string;
+  kind?: "classic" | "v2";
+  virtual_rtm?: string;
 };
 export type Call = {
   contractId: string;
@@ -116,6 +118,8 @@ export function makePlan(input: {
   const summary: string[] = [];
   if (i.action === "swap") {
     if (!p) throw Error("No pool exists for this token.");
+    if (p.kind === "v2")
+      throw Error("Whisk V2 pool detected. Its exact quote formula has not yet been verified, so this trade is not enabled rather than using the classic-pool formula.");
     const amount = units(i.amount),
       rtm = i.direction === "RTM_TO_TOKEN";
     if (!rtm && i.direction !== "TOKEN_TO_RTM")
