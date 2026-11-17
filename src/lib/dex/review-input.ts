@@ -15,8 +15,16 @@ export function parseReviewSnapshot(value: unknown, token: string, wallet: strin
   if (s.pool !== null) {
     if (!s.pool || typeof s.pool !== "object" || Array.isArray(s.pool)) throw Error("Invalid pool.");
     const p = s.pool as Record<string, unknown>;
-    if (p.token_b !== token) throw Error("Wrong pool token.");
-    pool = { token_b: token, reserve_rtm: atomic(p.reserve_rtm).toString(), reserve_token: atomic(p.reserve_token).toString(), lp_supply: atomic(p.lp_supply).toString() };
+    const kind = p.kind === "v2" ? "v2" : "classic";
+    if ((kind === "v2" ? p.token : p.token_b) !== token) throw Error("Wrong pool token.");
+    pool = {
+      token_b: token,
+      reserve_rtm: atomic(p.reserve_rtm).toString(),
+      reserve_token: atomic(p.reserve_token).toString(),
+      lp_supply: kind === "v2" ? "0" : atomic(p.lp_supply).toString(),
+      kind,
+      ...(kind === "v2" ? { virtual_rtm: atomic(p.virtual_rtm).toString() } : {}),
+    };
   }
   const lp = atomic(s.lp), locked = atomic(s.locked);
   if (typeof s.untilMs !== "number" || !Number.isSafeInteger(s.untilMs) || s.untilMs < -1 || locked > lp || (locked > 0n && s.untilMs < 0))
