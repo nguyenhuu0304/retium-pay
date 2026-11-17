@@ -1,4 +1,5 @@
-export const DEX = (process.env.NEXT_PUBLIC_RETIUM_DEX_CONTRACT_ID || "").trim().toLowerCase();
+// Candidate recovered from the 2026-11-17 Preview conversation; verify against live RPC before transactions.
+export const DEX = (process.env.NEXT_PUBLIC_RETIUM_DEX_CONTRACT_ID || "0cec8cdacc15be17ca5719c95459aaf57a3b412871fa0d7c6b9b4f638e2ddcdf").trim().toLowerCase();
 export const UNIT = 10n ** 18n;
 export type Pool = {
   token_b: string;
