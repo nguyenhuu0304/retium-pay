@@ -1,4 +1,4 @@
-# Retium Pay
+# RetiumP4y
 
 A community-built workspace for the Retium testnet: payment requests, group bills, Telegram notifications, token swaps, liquidity tools, token deployment and a read-only explorer.
 
@@ -12,7 +12,7 @@ This is an independent community project. It is not an official Retium product. 
 - Optional Telegram notifications, verified wallet linking, member registration with `/contact`, and personal contact nicknames.
 - Track requests and group totals in My History. Background workers continue checking saved transactions after the browser closes.
 - Swap and manage liquidity through the existing testnet trading contract; deploy a fungible test token.
-- Look up public transactions, wallets and contracts in Retium Pay Explorer.
+- Look up public transactions, wallets and contracts in RetiumP4y Explorer.
 
 ## Local setup (Windows PowerShell)
 
@@ -95,7 +95,7 @@ Development checks covered signed payment validation, duplicate prevention, grou
 
 ## Attribution
 
-Retium Wallet Connect and the Retium RPC are external services. DEX actions use the existing trading contract; using the Retium Pay interface does not change the on-chain contract's ownership or identity.
+Retium Wallet Connect and the Retium RPC are external services. DEX actions use the existing trading contract; using the RetiumP4y interface does not change the on-chain contract's ownership or identity.
 
 The bundled fungible-token WASM template originates from Whisk. See THIRD_PARTY.md. Project-wide licensing has not been selected in this snapshot; public source visibility alone does not grant a new redistribution license.
 
