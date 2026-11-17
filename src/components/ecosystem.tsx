@@ -23,8 +23,8 @@ export default function Ecosystem() {
   }, [pathname]);
   return (
     <nav className="ecosystem-nav" aria-label="Retium apps">
-      <Link href="/" className="app-brand" aria-label="Retium Pay dashboard">
-        Retium<span>Pay</span>
+      <Link href="/" className="app-brand" aria-label="RetiumP4y dashboard">
+        Retium<span>P4y</span>
       </Link>
       {links.map(([href, label]) => (
         <Link
