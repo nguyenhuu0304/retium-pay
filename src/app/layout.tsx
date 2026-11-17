@@ -8,8 +8,8 @@ import { SharedWalletProvider } from "../components/shared-wallet";
 import Ecosystem from "../components/ecosystem";
 
 export const metadata: Metadata = {
-  title: "Retium Pay | Testnet Payments",
-  description: "An independent community payment app for the Retium testnet.",
+  title: "RetiumP4y | Testnet Payments",
+  description: "RetiumP4y is an independent community-built payments and DeFi workspace for the Retium testnet.",
 };
 
 export default function RootLayout({
