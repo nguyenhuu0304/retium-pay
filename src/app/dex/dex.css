@@ -790,3 +790,167 @@ html[data-theme="light"] .dex-shell .back-to-edit {
     padding: 16px;
   }
 }
+
+
+/* RetiumP4y DEX visual pass — keep trade and settlement behavior unchanged. */
+.dex-shell {
+  max-width: 1120px;
+  padding-top: 24px;
+  color: #f4f5f8;
+}
+.dex-shell > nav {
+  align-items: center;
+  padding: 10px 14px;
+  border: 1px solid rgba(130, 140, 160, .18);
+  border-radius: 14px;
+  background: rgba(22, 25, 33, .72);
+  backdrop-filter: blur(14px);
+}
+.dex-shell > nav a {
+  transition: color .16s ease;
+}
+.dex-shell > nav a:hover {
+  color: #ff8b62;
+}
+.dex-shell > header {
+  text-align: left;
+  max-width: 960px;
+  margin: 34px auto 22px;
+}
+.dex-shell > header h1 {
+  font-size: clamp(34px, 5vw, 48px);
+  letter-spacing: -.045em;
+  line-height: 1.04;
+}
+.dex-shell > header .dex-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+.dex-shell > header .dex-eyebrow::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ff6427;
+  box-shadow: 0 0 13px rgba(255, 100, 39, .7);
+}
+.dex-shell .wallet-strip {
+  max-width: 960px;
+  padding: 12px 15px;
+  border: 1px solid #353a47;
+  border-radius: 14px;
+  background: linear-gradient(110deg, #20232c, #181b22);
+}
+.dex-shell .dex-card {
+  border-color: #363b48;
+  border-radius: 18px;
+  background: linear-gradient(145deg, #20232c, #181a21 78%);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, .15), inset 0 1px rgba(255,255,255,.025);
+}
+.dex-shell .trade-card {
+  border-color: rgba(255, 112, 62, .28);
+}
+.dex-shell .asset-box {
+  border-color: #3b4050;
+  background: linear-gradient(145deg, #11141b, #171a22);
+  transition: border-color .16s ease, background .16s ease;
+}
+.dex-shell .asset-box:focus-within {
+  border-color: rgba(255, 112, 62, .7);
+  background: #151820;
+}
+.dex-shell .asset-caption {
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.dex-shell .token-chip {
+  border: 1px solid #414757;
+  background: #292e3b;
+  transition: border-color .16s ease, background .16s ease;
+}
+.dex-shell .token-chip:hover:not(:disabled) {
+  border-color: #ff8054;
+  background: #34303a;
+}
+.dex-shell .dex-tabs button {
+  border-radius: 10px;
+  transition: color .16s ease, border-color .16s ease, background .16s ease;
+}
+.dex-shell .dex-tabs button:hover:not(:disabled) {
+  border-color: #6b5360;
+  color: #fff;
+}
+.dex-shell .dex-tabs .selected {
+  background: rgba(255, 92, 29, .12);
+  color: #ffb093;
+  border-color: rgba(255, 112, 62, .75);
+}
+.dex-shell button {
+  transition: transform .16s ease, filter .16s ease, border-color .16s ease;
+}
+.dex-shell button:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.dex-shell button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.dex-shell button:focus-visible,
+.dex-shell a:focus-visible,
+.dex-shell input:focus-visible,
+.dex-shell select:focus-visible {
+  outline: 2px solid #ff8b62;
+  outline-offset: 3px;
+}
+.dex-shell .primary-action {
+  border-radius: 12px;
+  box-shadow: 0 9px 25px rgba(255, 92, 29, .15);
+}
+.dex-shell .dex-notice {
+  border-left-width: 3px;
+  border-radius: 0 12px 12px 0;
+  background: linear-gradient(100deg, rgba(255, 92, 29, .08), #191b21 62%);
+}
+.dex-shell .token-picker {
+  border-color: #4a5060;
+  background: linear-gradient(145deg, #20232c, #171920);
+}
+.dex-shell .token-row {
+  border-radius: 10px;
+}
+.dex-shell .token-row:hover:not(:disabled) {
+  background: #292e3a;
+}
+@media (min-width: 1000px) {
+  .dex-shell > header {
+    max-width: 960px;
+  }
+  .dex-shell > .trade-card {
+    max-width: 540px;
+  }
+}
+@media (max-width: 700px) {
+  .dex-shell > nav {
+    gap: 12px;
+    padding: 9px 11px;
+    font-size: 12px;
+  }
+  .dex-shell > header {
+    margin: 28px 0 18px;
+  }
+  .dex-shell > header h1 {
+    font-size: clamp(32px, 9vw, 42px);
+  }
+  .dex-shell .dex-card {
+    border-radius: 15px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dex-shell *,
+  .dex-shell *::before,
+  .dex-shell *::after {
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+  }
+}
