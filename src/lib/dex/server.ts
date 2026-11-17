@@ -59,26 +59,28 @@ async function query(contract: string, method: string, args: string[] = []) {
 }
 export async function pools(cursor: string) {
   if (!/^[0-9]{1,12}$/.test(cursor)) throw Error("Invalid cursor.");
-  const data = JSON.parse(
-    await query(DEX, "list_pools", cursor === "0" ? [] : [cursor]),
+  const args = cursor === "0" ? [] : [cursor];
+  const [classicRaw, v2Raw] = await Promise.all([
+    query(DEX, "list_pools", args),
+    query(DEX, "list_v2", args),
+  ]);
+  const classicData = JSON.parse(classicRaw), v2Data = JSON.parse(v2Raw);
+  const classicRows = Array.isArray(classicData) ? classicData : classicData?.pools;
+  const v2Rows = Array.isArray(v2Data) ? v2Data : v2Data?.pools;
+  if (!Array.isArray(classicRows) || !Array.isArray(v2Rows)) throw Error("Invalid pool list.");
+  const nextValues = [classicData?.next, v2Data?.next].filter((n) =>
+    Number.isSafeInteger(n) && n > Number(cursor),
   );
-  const list = Array.isArray(data) ? data : data.pools;
-  if (!Array.isArray(list)) throw Error("Invalid pool list.");
-  const next =
-    !Array.isArray(data) &&
-    Number.isSafeInteger(data.next) &&
-    data.next > Number(cursor)
-      ? String(data.next)
-      : null;
   return {
-    pools: list
-      .filter((p: Pool) => p && /^[0-9a-f]{64}$/.test(p.token_b))
-      .slice(0, 100)
-      .map((p: Pool) => ({
-        token: p.token_b,
-        reserveRtm: atomic(p.reserve_rtm).toString(),
+    pools: [
+      ...classicRows.filter((p: any) => p && /^[0-9a-f]{64}$/.test(p.token_b)).map((p: any) => ({
+        token: p.token_b, reserveRtm: atomic(p.reserve_rtm).toString(), kind: "classic" as const,
       })),
-    next,
+      ...v2Rows.filter((p: any) => p && /^[0-9a-f]{64}$/.test(p.token)).map((p: any) => ({
+        token: p.token, reserveRtm: atomic(p.reserve_rtm).toString(), kind: "v2" as const,
+      })),
+    ].slice(0, 200),
+    next: nextValues.length ? String(Math.min(...nextValues)) : null,
   };
 }
 export async function tokenInfo(token: string) {
