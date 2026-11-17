@@ -167,8 +167,12 @@ export function makePlan(input: {
       `Estimated receive: ${fmt(expected)} ${rtm ? i.symbol : "RTM"}`,
       `Minimum receive: ${fmt(min)} ${rtm ? i.symbol : "RTM"}`,
     );
-    const impactBase = rtm ? r + (p.kind === "v2" ? atomic(p.virtual_rtm ?? "0") : 0n) : t;
-    const impact = (amount * 10000n) / (impactBase + amount);
+    const virtualRtm = p.kind === "v2" ? atomic(p.virtual_rtm ?? "0") : 0n;
+    const impactBase = r + virtualRtm;
+    const spotOut = rtm ? (amount * t) / impactBase : (amount * impactBase) / t;
+    const impact = p.kind === "v2"
+      ? spotOut > 0n ? Number(((spotOut - expected) * 10000n) / spotOut) : 0
+      : Number((amount * 10000n) / ((rtm ? r : t) + amount));
     if (impact >= 1000n)
       throw Error("Price impact is at least 10%. Reduce the trade size.");
     summary.push(
@@ -273,7 +277,7 @@ export function makePlan(input: {
     : { contractId: p?.source === "whisk" ? p.dex! : DEX, method, args, amountAtomic: attached.toString() };
   if (approval)
     summary.unshift(
-      `First approve ${fmt(requiredToken)} ${i.symbol} for the trading contract used by Retium Pay. Refresh the preview after approval confirms.`,
+      `First approve ${fmt(requiredToken)} ${i.symbol} for ${p?.source === "whisk" ? "Whisk" : "Retium Pay"}. Refresh the preview after approval confirms.`,
     );
   return {
     wallet: i.wallet,
