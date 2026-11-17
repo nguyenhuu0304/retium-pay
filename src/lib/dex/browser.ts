@@ -1,4 +1,4 @@
-import { decodeContractData, readPool, readAnyPool, WHISK_DEX, whiskPools } from "./pool-read";
+import { decodeContractData, readAnyPool, WHISK_DEX, whiskPools } from "./pool-read";
 // Public RPC reads supply review inputs; only independent backend reads can confirm settlement.
 import { publicRead } from "../rpc/public-read";
 import { DEX, atomic, decimalAtomic, type Pool } from "./math";
