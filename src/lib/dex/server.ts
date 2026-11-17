@@ -118,19 +118,9 @@ export async function market(token: string, wallet: string) {
   const account = await rpcRead(`wallet/${wallet}`);
   const balanceToken = atomic(await query(token, "balance_of", [wallet]));
   const allowance = atomic(await query(token, "allowance", [wallet, DEX]));
-  const position = pool
-    ? JSON.parse(await query(DEX, "get_lp_balance", [token, wallet]))
-    : { lp_balance: "0", locked: "0", until_ms: 0 };
-  const lp = atomic(position.lp_balance),
-    locked = atomic(position.locked);
-  const untilMs = Number(position.until_ms);
-  if (
-    !Number.isSafeInteger(untilMs) ||
-    untilMs < -1 ||
-    (locked > 0n && untilMs < 0) ||
-    locked > lp
-  )
-    throw Error("Invalid LP lock state.");
+  // Current Whisk DexCore metadata does not advertise get_lp_balance.
+  // Never call the legacy LP view and never infer an LP position from pool reserves.
+  const lp = 0n, locked = 0n, untilMs = 0;
   const nonce = account.nonce ?? account.next_nonce;
   if (!Number.isSafeInteger(nonce) || nonce < 0)
     throw Error("RPC did not return a usable wallet nonce.");
