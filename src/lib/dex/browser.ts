@@ -1,4 +1,4 @@
-import { decodeContractData, readPool } from "./pool-read";
+import { decodeContractData, readPool, readAnyPool, WHISK_DEX, whiskPools } from "./pool-read";
 // Public RPC reads supply review inputs; only independent backend reads can confirm settlement.
 import { publicRead } from "../rpc/public-read";
 import { DEX, atomic, decimalAtomic, type Pool } from "./math";
@@ -32,28 +32,18 @@ async function query(contract: string, method: string, args: string[] = []) {
   return data.output;
 }
 export async function pools(cursor: string) {
-  if (!/^[0-9]{1,12}$/.test(cursor)) throw Error("Invalid cursor.");
-  const data = decodeContractData(
-    await query(DEX, "list_pools", cursor === "0" ? [] : [cursor]),
-  );
-  const list = Array.isArray(data) ? data : data.pools;
-  if (!Array.isArray(list)) throw Error("Invalid pool list.");
-  const next =
-    !Array.isArray(data) &&
-    Number.isSafeInteger(data.next) &&
-    data.next > Number(cursor)
-      ? String(data.next)
-      : null;
-  return {
-    pools: list
-      .filter((p: Pool) => p && /^[0-9a-f]{64}$/.test(p.token_b))
-      .slice(0, 100)
-      .map((p: Pool) => ({
-        token: p.token_b,
-        reserveRtm: atomic(p.reserve_rtm).toString(),
-      })),
-    next,
-  };
+  const [source, rawCursor] = cursor.includes(":") ? cursor.split(":", 2) : ["r", cursor];
+  if (!["r", "w", "v"].includes(source) || !/^[0-9]{1,12}$/.test(rawCursor)) throw Error("Invalid cursor.");
+  if (source === "r") {
+    const data = decodeContractData(await query(DEX, "list_pools", rawCursor === "0" ? [] : [rawCursor]));
+    const list = Array.isArray(data) ? data : data.pools;
+    if (!Array.isArray(list)) throw Error("Invalid pool list.");
+    const next = !Array.isArray(data) && Number.isSafeInteger(data.next) && data.next > Number(rawCursor) ? `r:${data.next}` : "w:0";
+    return { pools: list.filter((p: Pool) => p && /^[0-9a-f]{64}$/.test(p.token_b)).slice(0,100).map((p: Pool) => ({ token:p.token_b, reserveRtm:atomic(p.reserve_rtm).toString() })), next };
+  }
+  const kind = source === "v" ? "v2" : "pool";
+  const page = await whiskPools(query, kind, rawCursor);
+  return { pools: page.pools.map(p => ({ token:p.token_b, reserveRtm:p.reserve_rtm })), next: page.next ? `${source}:${page.next}` : source === "w" ? "v:0" : null };
 }
 export async function tokenInfo(token: string) {
   const data = await rpcRead(`contract/${token}`);
@@ -118,11 +108,12 @@ export async function tokenWalletSummary(token: string, wallet: string) {
 }
 export async function market(token: string, wallet: string) {
   const info = await tokenInfo(token);
-  const pool = await readPool(query, token);
+  const pool = await readAnyPool(query, token);
   const account = await rpcRead(`wallet/${wallet}`);
   const balanceToken = atomic(await query(token, "balance_of", [wallet]));
-  const allowance = atomic(await query(token, "allowance", [wallet, DEX]));
-  const position = pool
+  const spender = pool?.source === "whisk" ? WHISK_DEX : DEX;
+  const allowance = atomic(await query(token, "allowance", [wallet, spender]));
+  const position = pool && pool.source !== "whisk"
     ? decodeContractData(await query(DEX, "get_lp_balance", [token, wallet]))
     : { lp_balance: "0", locked: "0", until_ms: 0 };
   const lp = atomic(position.lp_balance),
