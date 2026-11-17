@@ -2,7 +2,7 @@ import { verifyDexTx } from "../transactions/verify";
 import { rpcGet } from "../rpc/client";
 import { assertFeatureReady } from "../network/health";
 export { verifyDexTx } from "../transactions/verify";
-import { decodeContractData, readPool, readAnyPool, WHISK_DEX, whiskPools } from "./pool-read";
+import { decodeContractData, readAnyPool, WHISK_DEX, whiskPools } from "./pool-read";
 import { parseDeploymentAccount } from "./review-input";
 import { blake3 } from "@noble/hashes/blake3.js";
 import {
