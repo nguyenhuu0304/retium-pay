@@ -1,11 +1,10 @@
 "use client";
 import { CopyValue } from "./copy-value";
 import { UiText } from "./preferences";
-import { parseRememberedWallet } from "../lib/ui/remembered-wallet";
-
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import Script from "next/script";
 import Link from "next/link";
+
 type Account = { address: string; chainId: number };
 type Shared = {
   account: Account | null;
@@ -18,265 +17,226 @@ type Shared = {
 };
 const Context = createContext<Shared | null>(null);
 const storage = "retiump4y:shared-wallet:v1";
-export function SharedWalletProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const [account, setAccount] = useState<Account | null>(null),
-    [ready, setReady] = useState(false),
-    [busy, setBusy] = useState(false),
-    [notice, setNotice] = useState(""),
-    [remembered, setRemembered] = useState(false);
+
+function validAccount(value: unknown): Account | null {
+  if (!value || typeof value !== "object") return null;
+  const account = value as { address?: unknown; chainId?: unknown };
+  if (
+    typeof account.address !== "string" ||
+    !/^rete[0-9a-f]{68}$/.test(account.address) ||
+    Number(account.chainId) !== 3
+  ) return null;
+  return { address: account.address, chainId: 3 };
+}
+
+function waitForRetium(timeoutMs = 500): Promise<typeof window.retium | null> {
+  if (typeof window === "undefined") return Promise.resolve(null);
+  if (window.retium) return Promise.resolve(window.retium);
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      window.removeEventListener("retium#initialized", finish);
+      resolve(window.retium ?? null);
+    };
+    window.addEventListener("retium#initialized", finish, { once: true });
+    window.setTimeout(finish, timeoutMs);
+  });
+}
+
+export function SharedWalletProvider({ children }: { children: React.ReactNode }) {
+  const [account, setAccount] = useState<Account | null>(null);
+  const [ready, setReady] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [remembered, setRemembered] = useState(false);
   const lock = useRef(false);
+
+  function saveAccount(next: Account | null) {
+    setAccount(next);
+    setRemembered(false);
+    try {
+      if (next) {
+        localStorage.setItem(storage, JSON.stringify(next));
+        sessionStorage.setItem(storage, JSON.stringify(next));
+      } else {
+        localStorage.removeItem(storage);
+        sessionStorage.removeItem(storage);
+      }
+    } catch {
+      // The verified in-memory connection remains usable for this page.
+    }
+  }
+
   useEffect(() => {
     let live = true;
-    function restore(raw: string | null) {
-      if (!live) return;
-      const next = parseRememberedWallet(raw);
-      setAccount(next);
-      setRemembered(!!next);
-    }
-    Promise.resolve().then(() => {
+    async function restoreVerifiedWallet() {
       try {
-        let raw = localStorage.getItem(storage);
-        // Migrate the previous tab-only selection once. A stored "null" records disconnect.
-        if (raw === null) {
-          const legacy = sessionStorage.getItem(storage);
-          if (parseRememberedWallet(legacy)) {
-            raw = legacy;
-            localStorage.setItem(storage, raw!);
-          }
+        const provider = await waitForRetium();
+        if (!live) return;
+        if (!provider) {
+          setNotice("Retium Wallet was not detected. Install or unlock the wallet, then connect.");
+          return;
         }
-        restore(raw);
-      } catch {
-        try { restore(sessionStorage.getItem(storage)); } catch {}
+        // A saved address is never treated as a live connection. Ask the wallet
+        // again so account switches and revoked site permissions are respected.
+        const result = await provider.request({ method: "retium_requestAccounts" });
+        if (!live) return;
+        const next = validAccount(result);
+        if (!next) {
+          saveAccount(null);
+          setNotice("Select the Retium test network (chain 3) in your wallet.");
+          return;
+        }
+        saveAccount(next);
+        setNotice("");
+      } catch (error) {
+        if (!live) return;
+        const code = typeof error === "object" && error !== null && "code" in error
+          ? Number((error as { code?: unknown }).code)
+          : 0;
+        // 4001 means the user declined. A decline is not an application error.
+        if (code !== 4001) setNotice(error instanceof Error ? error.message : "Wallet restore failed. Connect again.");
+        saveAccount(null);
+      } finally {
+        if (live) setReady(true);
       }
-      if (live) setReady(true);
-    });
-    const changed = (event: StorageEvent) => {
-      if (event.key !== storage && event.key !== null) return;
-      try { sessionStorage.removeItem(storage); } catch {}
-      restore(event.key === null ? null : event.newValue);
-    };
-    window.addEventListener("storage", changed);
-    return () => {
-      live = false;
-      window.removeEventListener("storage", changed);
-    };
+    }
+    void restoreVerifiedWallet();
+    return () => { live = false; };
   }, []);
+
   async function logout() {
-    const r = await fetch("/api/payments", {
+    const response = await fetch("/api/payments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "logoutList" }),
       cache: "no-store",
     });
-    if (!r.ok) throw Error("Could not revoke the viewing session. Try again.");
+    if (!response.ok) throw Error("Could not revoke the viewing session. Try again.");
   }
+
   async function connect() {
     if (lock.current) return;
     lock.current = true;
     setBusy(true);
     setNotice("");
     try {
-      if (!window.retium)
-        throw Error("Wallet SDK is loading. Wait a moment and try again.");
-      // Keep the wallet request directly in the user gesture, before any network await.
-      const a = (await window.retium.request({
-        method: "retium_requestAccounts",
-      })) as Account;
-      if (
-        !a ||
-        !/^rete[0-9a-f]{68}$/.test(a.address) ||
-        Number(a.chainId) !== 3
-      )
-        throw Error("Select the Retium test network (chain 3).");
-      if (account && account.address !== a.address) await logout();
-      const next = { address: a.address, chainId: 3 };
-      setAccount(next);
-      setRemembered(false);
-      try {
-        localStorage.setItem(storage, JSON.stringify(next));
-        sessionStorage.setItem(storage, JSON.stringify(next));
-      } catch {
-        /* In-memory connection still works. */
-      }
-      setNotice(
-        "Wallet selected. Use it across RetiumP4y; each signature still needs your approval.",
-      );
-    } catch (e) {
-      setNotice(
-        e instanceof Error
-          ? e.message
-          : "Wallet connection was cancelled or failed.",
-      );
+      const provider = await waitForRetium();
+      if (!provider) throw Error("Retium Wallet is unavailable. Install or unlock the wallet and retry.");
+      // Keep the account request in the connect action; the wallet owns all keys.
+      const result = await provider.request({ method: "retium_requestAccounts" });
+      const next = validAccount(result);
+      if (!next) throw Error("Select the Retium test network (chain 3).");
+      if (account && account.address !== next.address) await logout();
+      saveAccount(next);
+      setNotice("Wallet verified. Every transaction still requires your approval in Retium Wallet.");
+    } catch (error) {
+      const code = typeof error === "object" && error !== null && "code" in error
+        ? Number((error as { code?: unknown }).code)
+        : 0;
+      setNotice(code === 4001 ? "Wallet connection was cancelled." : error instanceof Error ? error.message : "Wallet connection failed.");
     } finally {
       lock.current = false;
       setBusy(false);
     }
   }
+
   async function disconnect() {
     if (lock.current) return;
     lock.current = true;
     setBusy(true);
     try {
       await logout();
-      try {
-        localStorage.setItem(storage, "null");
-        sessionStorage.removeItem(storage);
-      } catch {}
-      setAccount(null);
-      setRemembered(false);
-      setNotice(
-        "Disconnected from RetiumP4y. Existing submitted transactions remain tracked.",
-      );
-    } catch (e) {
-      setNotice(e instanceof Error ? e.message : "Disconnect failed.");
+      saveAccount(null);
+      setNotice("Disconnected from RetiumP4y. Submitted transactions remain tracked.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Disconnect failed.");
     } finally {
       lock.current = false;
       setBusy(false);
     }
   }
+
   return (
-    <Context.Provider
-      value={{ account, ready, busy, notice, remembered, connect, disconnect }}
-    >
+    <Context.Provider value={{ account, ready, busy, notice, remembered, connect, disconnect }}>
       <Script
         src="https://wallet.retium.org/connect/sdk/retium-sdk-1.3.0.js"
         integrity="sha384-FTG6s31+cSLKvZXfREum814s/L2AnqVyikuFQvMKIvFfAz40ksTcaXVbRmkHGGTU"
         crossOrigin="anonymous"
         strategy="afterInteractive"
-        onError={() =>
-          setNotice("Could not load Web Wallet. Refresh this page.")
-        }
+        onError={() => setNotice("Could not load Retium Wallet SDK. Refresh this page.")}
       />
       <div key={account?.address || "disconnected"}>{children}</div>
     </Context.Provider>
   );
 }
+
 export function useSharedWallet() {
   const value = useContext(Context);
   if (!value) throw Error("Shared wallet provider is missing.");
   return value;
 }
+
 export function DashboardWallet() {
-  const w = useSharedWallet();
+  const wallet = useSharedWallet();
   const [copied, setCopied] = useState(false);
   return (
     <section className="dashboard-wallet" aria-label="Wallet connection">
       <div>
-        <p className="eyebrow">{<UiText text={"YOUR WALLET · CHAIN 3"} />}</p>
-        <h2>
-          {w.account ? (
-            <UiText text={"Your wallet is ready to use"} />
-          ) : (
-            <UiText text={"Connect once. Use every tool."} />
-          )}
-        </h2>
-        {w.account ? (
+        <p className="eyebrow"><UiText text={"YOUR WALLET · CHAIN 3"} /></p>
+        <h2>{wallet.account ? <UiText text={"Your wallet is ready to use"} /> : <UiText text={"Connect once. Use every tool."} />}</h2>
+        {wallet.account ? (
           <>
-            <p className="shared-wallet-address">
-              <CopyValue value={w.account.address} compact />
-            </p>
-            <p className="muted">
-              {w.remembered ? (
-                <UiText
-                  text={
-                    "Remembered address. Ownership is verified separately when a signature is required."
-                  }
-                />
-              ) : (
-                <UiText
-                  text={
-                    "Selected on this browser. Signatures and private data still require verification."
-                  }
-                />
-              )}
-            </p>
+            <p className="shared-wallet-address"><CopyValue value={wallet.account.address} compact /></p>
+            <p className="muted"><UiText text={"Wallet verified by Retium Wallet for this page. Signatures and private data still require separate approval."} /></p>
           </>
         ) : (
-          <p className="muted">
-            {
-              <UiText
-                text={
-                  "Connect here before opening Payments, My History, DEX or Deploy."
-                }
-              />
-            }
-          </p>
+          <p className="muted"><UiText text={"Connect here before opening Payments, My History, DEX or Deploy."} /></p>
         )}
       </div>
       <div className="dashboard-wallet-actions">
-        <button
-          className={w.account ? "button secondary" : "button primary"}
-          disabled={!w.ready || w.busy}
-          onClick={() => void w.connect()}
-        >
-          {w.busy ? (
-            <UiText text={"Please wait…"} />
-          ) : w.account ? (
-            <UiText text={"Change / confirm wallet"} />
-          ) : (
-            <UiText text={"Connect Wallet"} />
-          )}
+        <button className={wallet.account ? "button secondary" : "button primary"} disabled={!wallet.ready || wallet.busy} onClick={() => void wallet.connect()}>
+          {wallet.busy ? <UiText text={"Please wait…"} /> : wallet.account ? <UiText text={"Change / confirm wallet"} /> : <UiText text={"Connect Wallet"} />}
         </button>
-        {w.account && (
+        {wallet.account && (
           <>
-            <button
-              className="button secondary"
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(w.account!.address);
-                  setCopied(true);
-                } catch {
-                  setCopied(false);
-                }
-              }}
-            >
-              {copied ? (
-                <UiText text={"Copied"} />
-              ) : (
-                <UiText text={"Copy address"} />
-              )}
-            </button>
-            <button
-              className="button secondary"
-              disabled={w.busy}
-              onClick={() => void w.disconnect()}
-            >
-              {<UiText text={"Disconnect"} />}
-            </button>
+            <button className="button secondary" onClick={async () => {
+              try { await navigator.clipboard.writeText(wallet.account!.address); setCopied(true); }
+              catch { setCopied(false); }
+            }}>{copied ? <UiText text={"Copied"} /> : <UiText text={"Copy address"} />}</button>
+            <button className="button secondary" disabled={wallet.busy} onClick={() => void wallet.disconnect()}><UiText text={"Disconnect"} /></button>
           </>
         )}
       </div>
-      {w.notice && (
-        <p className="shared-wallet-notice" role="status">
-          {<UiText text={w.notice} />}
-        </p>
-      )}
+      {wallet.notice && <p className="shared-wallet-notice" role="status"><UiText text={wallet.notice} /></p>}
     </section>
   );
 }
+
 export function WalletRequired() {
   return (
     <p className="shared-wallet-required">
-      {<UiText text={"Select your wallet on the "} />}
-      <Link href="/">{<UiText text={"Dashboard →"} />}</Link>
-      {<UiText text={" to use this tool."} />}
+      <UiText text={"Select your wallet on the "} />
+      <Link href="/"><UiText text={"Dashboard →"} /></Link>
+      <UiText text={" to use this tool."} />
     </p>
   );
 }
+
 export function WalletIndicator() {
-  const w = useSharedWallet();
-  if (!w.account) return <Link className="wallet-select-link" href="/"><UiText text="Connect Wallet" /></Link>;
-  return <details className="wallet-menu">
-    <summary title={w.account.address}><span className="connection-dot" /><code>{w.account.address.slice(0, 10)}…{w.account.address.slice(-7)}</code></summary>
-    <div>
-      <p className="wallet-menu-label"><UiText text={w.remembered ? "Selected wallet" : "Wallet connected"} /></p>
-      <CopyValue value={w.account.address} compact />
-      <button disabled={!w.ready || w.busy} onClick={() => void w.connect()}><UiText text="Change / confirm wallet" /></button>
-      <button disabled={w.busy} onClick={() => void w.disconnect()}><UiText text="Disconnect" /></button>
-    </div>
-  </details>;
+  const wallet = useSharedWallet();
+  if (!wallet.account) return <Link className="wallet-select-link" href="/"><UiText text="Connect Wallet" /></Link>;
+  return (
+    <details className="wallet-menu">
+      <summary title={wallet.account.address}><span className="connection-dot" /><code>{wallet.account.address.slice(0, 10)}…{wallet.account.address.slice(-7)}</code></summary>
+      <div>
+        <p className="wallet-menu-label"><UiText text="Wallet connected" /></p>
+        <CopyValue value={wallet.account.address} compact />
+        <button disabled={!wallet.ready || wallet.busy} onClick={() => void wallet.connect()}><UiText text="Change / confirm wallet" /></button>
+        <button disabled={wallet.busy} onClick={() => void wallet.disconnect()}><UiText text="Disconnect" /></button>
+      </div>
+    </details>
+  );
 }
