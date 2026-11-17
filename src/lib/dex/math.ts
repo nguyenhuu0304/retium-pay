@@ -259,7 +259,7 @@ export function makePlan(input: {
       `Lock until: ${new Date(until).toISOString()}`,
       "Locked shares cannot be withdrawn before this date.",
     );
-  } else throw Error("Unsupported DEX action.");
+  } else if (i.action !== "swap") throw Error("Unsupported DEX action.");
   if (i.balanceToken < requiredToken) throw Error("Not enough token balance.");
   // A reserve is a buffer, not a guaranteed network fee quote.
   if (i.balanceRtm < attached + UNIT)
