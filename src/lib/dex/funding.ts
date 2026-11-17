@@ -21,7 +21,7 @@ export function assessFunding(i: FundingInput) {
       return null;
   }
   if (i.action === "add") {
-    if (!i.pool || !Number.isInteger(i.bps) || i.bps < 10 || i.bps > 500)
+    if (!i.pool || i.pool.kind === "v2" || !Number.isInteger(i.bps) || i.bps < 10 || i.bps > 500)
       return null;
     const r = atomic(i.pool.reserve_rtm),
       t = atomic(i.pool.reserve_token);
