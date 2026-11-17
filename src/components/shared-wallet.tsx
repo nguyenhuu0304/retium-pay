@@ -143,7 +143,9 @@ export function SharedWalletProvider({
       value={{ account, ready, busy, notice, remembered, connect, disconnect }}
     >
       <Script
-        src="https://wallet.retium.org/connect/sdk/retium-sdk-1.5.0.js"
+        src="https://wallet.retium.org/connect/sdk/retium-sdk-1.3.0.js"
+        integrity="sha384-FTG6s31+cSLKvZXfREum814s/L2AnqVyikuFQvMKIvFfAz40ksTcaXVbRmkHGGTU"
+        crossOrigin="anonymous"
         strategy="afterInteractive"
         onError={() =>
           setNotice("Could not load Web Wallet. Refresh this page.")
