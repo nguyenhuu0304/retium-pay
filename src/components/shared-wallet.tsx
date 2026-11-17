@@ -144,8 +144,6 @@ export function SharedWalletProvider({
     >
       <Script
         src="https://wallet.retium.org/connect/sdk/retium-sdk-1.5.0.js"
-        integrity="sha384-IZZw04xxx1GLXviLZ7lw+B5XTi4SNw7Y6fUYf2zdJ8b54pBxVv5KqdvLSjQhZL3v"
-        crossOrigin="anonymous"
         strategy="afterInteractive"
         onError={() =>
           setNotice("Could not load Web Wallet. Refresh this page.")
