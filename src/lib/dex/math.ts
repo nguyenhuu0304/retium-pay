@@ -149,10 +149,10 @@ export function makePlan(input: {
       rtm = i.direction === "RTM_TO_TOKEN";
     if (!rtm && i.direction !== "TOKEN_TO_RTM")
       throw Error("Invalid swap direction.");
-    const expected = output(amount, rtm ? r : t, rtm ? t : r),
+    const expected = poolOutput(p, amount, rtm),
       min = minimum(expected, b);
     if (min <= 0n) throw Error("Trade is too small.");
-    method = "swap";
+    method = p.kind === "v2" ? "swap_v2" : "swap";
     args = [
       i.token,
       amount.toString(),
@@ -167,13 +167,15 @@ export function makePlan(input: {
       `Estimated receive: ${fmt(expected)} ${rtm ? i.symbol : "RTM"}`,
       `Minimum receive: ${fmt(min)} ${rtm ? i.symbol : "RTM"}`,
     );
-    const impact = (amount * 10000n) / ((rtm ? r : t) + amount);
+    const impactBase = rtm ? r + (p.kind === "v2" ? atomic(p.virtual_rtm ?? "0") : 0n) : t;
+    const impact = (amount * 10000n) / (impactBase + amount);
     if (impact >= 1000n)
       throw Error("Price impact is at least 10%. Reduce the trade size.");
     summary.push(
-      `Pool fee: 0.3% of input. Price impact estimate: ${Number(impact) / 100}%.`,
+      `Pool fee: ${poolFeeBps(p) / 100}% of input. Price impact estimate: ${Number(impact) / 100}%.`,
     );
-  } else if (i.action === "add") {
+  } else if (p?.source === "whisk" && i.action !== "swap") throw Error("Whisk liquidity is external. Retium Pay LP actions are available only for Retium pools.");
+  if (i.action === "add") {
     if (!p || r <= 0n || t <= 0n || supply <= 0n)
       throw Error("Use Create pool for a new token pair.");
     const amount = units(i.amount),
@@ -265,10 +267,10 @@ export function makePlan(input: {
     ? {
         contractId: i.token,
         method: "approve",
-        args: [DEX, requiredToken.toString()],
+        args: [p?.source === "whisk" ? p.dex! : DEX, requiredToken.toString()],
         amountAtomic: "0",
       }
-    : { contractId: DEX, method, args, amountAtomic: attached.toString() };
+    : { contractId: p?.source === "whisk" ? p.dex! : DEX, method, args, amountAtomic: attached.toString() };
   if (approval)
     summary.unshift(
       `First approve ${fmt(requiredToken)} ${i.symbol} for the trading contract used by Retium Pay. Refresh the preview after approval confirms.`,
