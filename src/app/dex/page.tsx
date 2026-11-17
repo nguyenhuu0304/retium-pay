@@ -337,8 +337,10 @@ export default function DexPage() {
     if (busy || cursor === null) return;
     setBusy(true);
     try {
-      const [page, offset] = cursor.split(":");
-      const data = await tokenPage(page, Number(offset));
+      const parts = cursor.split(":");
+      const offset = Number(parts.pop());
+      const page = parts.join(":");
+      const data = await tokenPage(page, offset);
       setPoolList((old) => [
         ...new Map(
           [...old, ...data.tokens].map((item) => [item.token, item]),
