@@ -1,5 +1,5 @@
-// Candidate recovered from the 2026-11-17 Preview conversation; verify against live RPC before transactions.
-export const DEX = (process.env.NEXT_PUBLIC_RETIUM_DEX_CONTRACT_ID || "0cec8cdacc15be17ca5719c95459aaf57a3b412871fa0d7c6b9b4f638e2ddcdf").trim().toLowerCase();
+// Whisk DexCore v1.5.1 — contract metadata previously confirmed on Retium RPC.
+export const DEX = (process.env.NEXT_PUBLIC_RETIUM_DEX_CONTRACT_ID || "59bf79b965fc9ae4f6854ca766027d0275e76bc56f060a377ec49106baf54f61").trim().toLowerCase();
 export const UNIT = 10n ** 18n;
 export type Pool = {
   token_b: string;
