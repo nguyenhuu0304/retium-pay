@@ -33,7 +33,7 @@ const tools = [
   },
   {
     title: "Swap & liquidity",
-    text: "Swap tokens, create pools and manage liquidity in Retium Pay.",
+    text: "Swap tokens, create pools and manage liquidity in RetiumP4y.",
     href: "/dex",
     label: "Open DEX",
     number: "04",
@@ -46,7 +46,7 @@ const tools = [
     number: "05",
   },
   {
-    title: "Retium Pay Explorer",
+    title: "RetiumP4y Explorer",
     text: "Look up public transactions, wallets and contracts.",
     href: "/explorer",
     label: "Open Explorer",
@@ -59,7 +59,7 @@ export default function Home() {
       <header className="dashboard-heading">
         <div>
           <p className="eyebrow">
-            {<UiText text={"RETIUM PAY · TESTNET"} />}
+            {<UiText text={"RETIUMP4Y · RETIUM TESTNET"} />}
           </p>
           <h1>{<UiText text={"Your Retium workspace."} />}</h1>
           <p>
@@ -83,7 +83,7 @@ export default function Home() {
             {
               <UiText
                 text={
-                  "Link your wallet once to receive notifications from Retium Pay."
+                  "Link your wallet once to receive notifications from RetiumP4y."
                 }
               />
             }
