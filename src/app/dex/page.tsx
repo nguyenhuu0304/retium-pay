@@ -50,7 +50,7 @@ type Market = Preview["market"] & {
   wallet: string;
   readAt: number;
 };
-type PickerToken = { token: string; symbol: string; supported: boolean };
+type PickerToken = { token: string; symbol: string; supported: boolean; kind?: "classic" | "v2" };
 const short = (value: string) =>
   value ? `${value.slice(0, 8)}…${value.slice(-6)}` : "";
 const displayAmount = (value: bigint) => {
@@ -521,7 +521,7 @@ export default function DexPage() {
   const inputRtm = direction === "RTM_TO_TOKEN";
   let estimate = "—",
     minimumReceive = "—";
-  if (action === "swap" && activeMarket?.pool) {
+  if (action === "swap" && activeMarket?.pool && activeMarket.pool.kind !== "v2") {
     try {
       const pool = activeMarket.pool;
       const result = output(
