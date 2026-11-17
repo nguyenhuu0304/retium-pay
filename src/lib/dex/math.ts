@@ -7,6 +7,10 @@ export type Pool = {
   reserve_rtm: string;
   reserve_token: string;
   lp_supply: string;
+  source?: "retium" | "whisk";
+  kind?: "pool" | "v2";
+  dex?: string;
+  virtual_rtm?: string;
 };
 export type Call = {
   contractId: string;
@@ -75,6 +79,30 @@ export function output(input: bigint, reserveIn: bigint, reserveOut: bigint) {
   if (input <= 0n || reserveIn <= 0n || reserveOut <= 0n)
     throw Error("Pool has no usable liquidity.");
   return (input * 997n * reserveOut) / (reserveIn * 1000n + input * 997n);
+}
+export function poolOutput(pool: Pool, input: bigint, buy: boolean) {
+  if (input <= 0n) throw Error("Enter a positive amount.");
+  const reserveRtm = atomic(pool.reserve_rtm);
+  const reserveToken = atomic(pool.reserve_token);
+  if (pool.kind === "v2") {
+    const virtualRtm = atomic(pool.virtual_rtm ?? "0");
+    const feeInput = input * 99n / 100n;
+    if (buy) {
+      const reserveIn = reserveRtm + virtualRtm;
+      if (reserveIn <= 0n || reserveToken <= 0n) throw Error("Launch market has no usable liquidity.");
+      return feeInput * reserveToken / (reserveIn + feeInput);
+    }
+    const reserveIn = reserveToken;
+    const reserveOut = reserveRtm + virtualRtm;
+    if (reserveIn <= 0n || reserveOut <= 0n) throw Error("Launch market has no usable liquidity.");
+    const gross = input * reserveOut / (reserveIn + input);
+    if (gross > reserveRtm) return 0n;
+    return gross - gross / 100n;
+  }
+  return output(input, buy ? reserveRtm : reserveToken, buy ? reserveToken : reserveRtm);
+}
+export function poolFeeBps(pool: Pool) {
+  return pool.kind === "v2" ? 100 : 30;
 }
 export function makePlan(input: {
   wallet: string;
