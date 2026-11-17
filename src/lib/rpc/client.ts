@@ -2,7 +2,7 @@ import { getRetiumNetworkConfig } from "../network/registry";
 
 const MAX_RESPONSE_BYTES = 1_500_000;
 const SAFE_PATH =
-  /^(?:transaction\/tx_[0-9a-f]{32}|contract\/[0-9a-f]{64}(?:\/query\?method=(?:list_pools|get_pool|get_lp_balance|balance_of|allowance|market|position)&args=[0-9A-Za-z_,]*)?|wallet\/rete[0-9a-f]{68}(?:\/tokens|\/transactions\?limit=20&offset=\d+)?)$/;
+  /^(?:transaction\/tx_[0-9a-f]{32}|contract\/[0-9a-f]{64}(?:\/query\?method=(?:list_pools|get_pool|list_v2|get_v2|get_lp_balance|balance_of|allowance|market|position)&args=[0-9A-Za-z_,]*)?|wallet\/rete[0-9a-f]{68}(?:\/tokens|\/transactions\?limit=20&offset=\d+)?)$/;
 
 export function validateRetiumReadPath(path: string): string {
   const normalized = path.replace(/^\/+/, "");

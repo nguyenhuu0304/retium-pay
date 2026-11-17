@@ -7,6 +7,10 @@ export type Pool = {
   reserve_rtm: string;
   reserve_token: string;
   lp_supply: string;
+  source?: "retium" | "whisk";
+  kind?: "pool" | "v2";
+  dex?: string;
+  virtual_rtm?: string;
 };
 export type Call = {
   contractId: string;
@@ -76,6 +80,30 @@ export function output(input: bigint, reserveIn: bigint, reserveOut: bigint) {
     throw Error("Pool has no usable liquidity.");
   return (input * 997n * reserveOut) / (reserveIn * 1000n + input * 997n);
 }
+export function poolOutput(pool: Pool, input: bigint, buy: boolean) {
+  if (input <= 0n) throw Error("Enter a positive amount.");
+  const reserveRtm = atomic(pool.reserve_rtm);
+  const reserveToken = atomic(pool.reserve_token);
+  if (pool.kind === "v2") {
+    const virtualRtm = atomic(pool.virtual_rtm ?? "0");
+    const feeInput = input * 99n / 100n;
+    if (buy) {
+      const reserveIn = reserveRtm + virtualRtm;
+      if (reserveIn <= 0n || reserveToken <= 0n) throw Error("Launch market has no usable liquidity.");
+      return feeInput * reserveToken / (reserveIn + feeInput);
+    }
+    const reserveIn = reserveToken;
+    const reserveOut = reserveRtm + virtualRtm;
+    if (reserveIn <= 0n || reserveOut <= 0n) throw Error("Launch market has no usable liquidity.");
+    const gross = input * reserveOut / (reserveIn + input);
+    if (gross > reserveRtm) return 0n;
+    return gross - gross / 100n;
+  }
+  return output(input, buy ? reserveRtm : reserveToken, buy ? reserveToken : reserveRtm);
+}
+export function poolFeeBps(pool: Pool) {
+  return pool.kind === "v2" ? 100 : 30;
+}
 export function makePlan(input: {
   wallet: string;
   token: string;
@@ -121,10 +149,10 @@ export function makePlan(input: {
       rtm = i.direction === "RTM_TO_TOKEN";
     if (!rtm && i.direction !== "TOKEN_TO_RTM")
       throw Error("Invalid swap direction.");
-    const expected = output(amount, rtm ? r : t, rtm ? t : r),
+    const expected = poolOutput(p, amount, rtm),
       min = minimum(expected, b);
     if (min <= 0n) throw Error("Trade is too small.");
-    method = "swap";
+    method = p.kind === "v2" ? "swap_v2" : "swap";
     args = [
       i.token,
       amount.toString(),
@@ -139,13 +167,19 @@ export function makePlan(input: {
       `Estimated receive: ${fmt(expected)} ${rtm ? i.symbol : "RTM"}`,
       `Minimum receive: ${fmt(min)} ${rtm ? i.symbol : "RTM"}`,
     );
-    const impact = (amount * 10000n) / ((rtm ? r : t) + amount);
+    const virtualRtm = p.kind === "v2" ? atomic(p.virtual_rtm ?? "0") : 0n;
+    const impactBase = r + virtualRtm;
+    const spotOut = rtm ? (amount * t) / impactBase : (amount * impactBase) / t;
+    const impact = p.kind === "v2"
+      ? spotOut > 0n ? Number(((spotOut - expected) * 10000n) / spotOut) : 0
+      : Number((amount * 10000n) / ((rtm ? r : t) + amount));
     if (impact >= 1000n)
       throw Error("Price impact is at least 10%. Reduce the trade size.");
     summary.push(
-      `Pool fee: 0.3% of input. Price impact estimate: ${Number(impact) / 100}%.`,
+      `Pool fee: ${poolFeeBps(p) / 100}% of input. Price impact estimate: ${Number(impact) / 100}%.`,
     );
-  } else if (i.action === "add") {
+  } else if (p?.source === "whisk" && i.action !== "swap") throw Error("Whisk liquidity is external. Retium Pay LP actions are available only for Retium pools.");
+  if (i.action === "add") {
     if (!p || r <= 0n || t <= 0n || supply <= 0n)
       throw Error("Use Create pool for a new token pair.");
     const amount = units(i.amount),
@@ -225,7 +259,7 @@ export function makePlan(input: {
       `Lock until: ${new Date(until).toISOString()}`,
       "Locked shares cannot be withdrawn before this date.",
     );
-  } else throw Error("Unsupported DEX action.");
+  } else if (i.action !== "swap") throw Error("Unsupported DEX action.");
   if (i.balanceToken < requiredToken) throw Error("Not enough token balance.");
   // A reserve is a buffer, not a guaranteed network fee quote.
   if (i.balanceRtm < attached + UNIT)
@@ -237,13 +271,13 @@ export function makePlan(input: {
     ? {
         contractId: i.token,
         method: "approve",
-        args: [DEX, requiredToken.toString()],
+        args: [p?.source === "whisk" ? p.dex! : DEX, requiredToken.toString()],
         amountAtomic: "0",
       }
-    : { contractId: DEX, method, args, amountAtomic: attached.toString() };
+    : { contractId: p?.source === "whisk" ? p.dex! : DEX, method, args, amountAtomic: attached.toString() };
   if (approval)
     summary.unshift(
-      `First approve ${fmt(requiredToken)} ${i.symbol} for the trading contract used by Retium Pay. Refresh the preview after approval confirms.`,
+      `First approve ${fmt(requiredToken)} ${i.symbol} for ${p?.source === "whisk" ? "Whisk" : "Retium Pay"}. Refresh the preview after approval confirms.`,
     );
   return {
     wallet: i.wallet,
