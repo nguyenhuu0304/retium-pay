@@ -162,8 +162,8 @@ export function SharedWalletProvider({ children }: { children: React.ReactNode }
   return (
     <Context.Provider value={{ account, ready, busy, notice, remembered, connect, disconnect }}>
       <Script
-        src="https://wallet.retium.org/connect/sdk/retium-sdk-1.5.0.js"
-        integrity="sha384-IZZw04xxx1GLXviLZ7lw+B5XTi4SNw7Y6fUYf2zdJ8b54pBxVv5KqdvLSjQhZL3v"
+        src="https://wallet.retium.org/connect/sdk/retium-sdk-1.3.0.js"
+        integrity="sha384-FTG6s31+cSLKvZXfREum814s/L2AnqVyikuFQvMKIvFfAz40ksTcaXVbRmkHGGTU"
         crossOrigin="anonymous"
         strategy="afterInteractive"
         onError={() => setNotice("Could not load Retium Wallet SDK. Refresh this page.")}
