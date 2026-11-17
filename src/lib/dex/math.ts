@@ -1,5 +1,6 @@
 // Whisk DexCore v1.5.1 — contract metadata previously confirmed on Retium RPC.
 export const DEX = (process.env.NEXT_PUBLIC_RETIUM_DEX_CONTRACT_ID || "59bf79b965fc9ae4f6854ca766027d0275e76bc56f060a377ec49106baf54f61").trim().toLowerCase();
+export const MARKET = (process.env.NEXT_PUBLIC_RETIUM_MARKET_CONTRACT_ID || "c28c81ee2e9719a095b81eb5c7476bfc049e816bd6c12b604ae089c63eea1cfe").trim().toLowerCase();
 export const UNIT = 10n ** 18n;
 export type Pool = {
   token_b: string;
@@ -97,6 +98,9 @@ export function makePlan(input: {
   now: number;
 }): Plan {
   const i = input,
+  if (["add", "remove", "lock"].includes(i.action)) {
+    throw Error("This Whisk DexCore deployment does not advertise LP add/remove/lock methods. These actions are disabled until the exact supported contract interface is verified.");
+  }
     b = i.bps;
   if (!Number.isInteger(b) || b < 10 || b > 500)
     throw Error("Slippage must be between 0.10% and 5.00%.");
