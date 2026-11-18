@@ -8,12 +8,13 @@ function parsePool(value: unknown, token: string, kind: "classic" | "v2"): Pool 
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw Error("Invalid pool response.");
   const p = value as Record<string, unknown>;
-  // Whisk returns classic pools in snake_case and V2 pools in camelCase.
-  const returnedToken = kind === "v2" ? p.tokenId : p.token_b;
+  // The deployed Whisk RPC returns V2 fields in snake_case.
+  // Accept camelCase too for compatibility with older indexed responses.
+  const returnedToken = kind === "v2" ? (p.token ?? p.tokenId) : p.token_b;
   if (typeof returnedToken !== "string" || !/^[0-9a-f]{64}$/.test(returnedToken) || returnedToken !== token)
     throw Error("Wrong pool returned.");
-  const reserveRtm = kind === "v2" ? p.reserveRtm : p.reserve_rtm;
-  const reserveToken = kind === "v2" ? p.reserveToken : p.reserve_token;
+  const reserveRtm = kind === "v2" ? (p.reserve_rtm ?? p.reserveRtm) : p.reserve_rtm;
+  const reserveToken = kind === "v2" ? (p.reserve_token ?? p.reserveToken) : p.reserve_token;
   const pool: Pool = {
     token_b: token,
     reserve_rtm: atomic(reserveRtm).toString(),
@@ -21,7 +22,7 @@ function parsePool(value: unknown, token: string, kind: "classic" | "v2"): Pool 
     lp_supply: kind === "classic" ? atomic(p.lp_supply).toString() : "0",
     kind,
   };
-  if (kind === "v2") pool.virtual_rtm = atomic(p.virtualRtm).toString();
+  if (kind === "v2") pool.virtual_rtm = atomic(p.virtual_rtm ?? p.virtualRtm).toString();
   return pool;
 }
 
