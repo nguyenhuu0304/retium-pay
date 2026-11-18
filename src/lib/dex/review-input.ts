@@ -16,7 +16,10 @@ export function parseReviewSnapshot(value: unknown, token: string, wallet: strin
     if (!s.pool || typeof s.pool !== "object" || Array.isArray(s.pool)) throw Error("Invalid pool.");
     const p = s.pool as Record<string, unknown>;
     const kind = p.kind === "v2" ? "v2" : "classic";
-    if ((kind === "v2" ? p.token : p.token_b) !== token) throw Error("Wrong pool token.");
+    // readPool() normalizes both classic and V2 results to Pool.token_b.
+    // The raw Whisk get_v2 response uses tokenId, but that is not the shape
+    // carried inside this signed review snapshot.
+    if (p.token_b !== token) throw Error("Wrong pool token.");
     pool = {
       token_b: token,
       reserve_rtm: atomic(p.reserve_rtm).toString(),
