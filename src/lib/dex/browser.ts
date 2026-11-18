@@ -98,9 +98,30 @@ export async function market(token: string, wallet: string) {
   const account = await rpcRead(`wallet/${wallet}`);
   const balanceToken = atomic(await query(token, "balance_of", [wallet]));
   const allowance = atomic(await query(token, "allowance", [wallet, DEX]));
-  // The exact LP-balance query and response schema are not yet verified.
-  // Never infer an LP position from pool reserves.
-  const lp = 0n, locked = 0n, untilMs = 0;
+
+  // Whisk reads LP positions from the DEX contract, not from the token contract.
+  // get_lp_balance(token, wallet) returns the wallet balance, locked amount,
+  // lock expiry (milliseconds), and the authoritative LP total supply.
+  let lp = 0n, locked = 0n, untilMs = 0;
+  if (pool) {
+    const rawLp = JSON.parse(await query(DEX, "get_lp_balance", [token, wallet]));
+    if (!rawLp || typeof rawLp !== "object" || Array.isArray(rawLp))
+      throw Error("DEX returned an invalid LP balance.");
+    lp = atomic(rawLp.lp_balance);
+    locked = atomic(rawLp.locked);
+    const until = Number(rawLp.until_ms ?? -1);
+    if (!Number.isFinite(until))
+      throw Error("DEX returned an invalid LP lock expiry.");
+    untilMs = until;
+    const lpSupply = atomic(rawLp.lp_total_supply);
+    if (lpSupply <= 0n)
+      throw Error("DEX returned an invalid LP total supply.");
+    // Use the same total supply Whisk uses for share calculations.
+    pool.lp_supply = lpSupply.toString();
+    if (locked > lp)
+      throw Error("DEX reports more locked LP than the wallet owns.");
+  }
+
   const nonce = account.nonce ?? account.next_nonce;
   if (!Number.isSafeInteger(nonce) || nonce < 0)
     throw Error("RPC did not return a usable wallet nonce.");
