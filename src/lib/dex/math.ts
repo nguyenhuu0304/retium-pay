@@ -60,7 +60,7 @@ export function sqrt(n: bigint) {
   if (n < 0n) throw Error("Negative square root.");
   if (n < 2n) return n;
   let x = n,
-    y = (n + 1n) / 2n;
+    y = (x + 1n) / 2n;
   while (y < x) {
     x = y;
     y = (x + n / x) / 2n;
@@ -99,7 +99,12 @@ export function quoteV2(input: bigint, direction: string, pool: Pool): bigint {
   if (direction === "TOKEN_TO_RTM") {
     const grossOutput = (curveRtm * input) / (reserveToken + input);
     const fee = (grossOutput * feeBps) / 10000n;
-    return grossOutput - fee;
+    const netOutput = grossOutput - fee;
+    // Virtual RTM is used for pricing, not as withdrawable liquidity.
+    // Never quote a sell that exceeds the pool's actual RTM reserve.
+    if (netOutput > reserveRtm)
+      throw Error("V2 pool has insufficient real RTM liquidity for this sell.");
+    return netOutput;
   }
   throw Error("Invalid swap direction.");
 }
@@ -126,9 +131,6 @@ export function makePlan(input: {
 }): Plan {
   const i = input;
   const b = i.bps;
-  if (["add", "remove", "lock"].includes(i.action)) {
-    throw Error("The exact Whisk liquidity method signatures and LP accounting have not yet been verified against the deployed contract. Add/remove/lock remain disabled to avoid submitting an unsafe call.");
-  }
   if (!Number.isInteger(b) || b < 10 || b > 500)
     throw Error("Slippage must be between 0.10% and 5.00%.");
   const deadline = i.now + 20 * 60_000;
@@ -222,8 +224,12 @@ export function makePlan(input: {
     if (!p || supply <= 0n) throw Error("Pool unavailable.");
     const shares = units(i.shares);
     if (shares > i.lp - i.locked) throw Error("Not enough unlocked LP shares.");
-    const mr = minimum((r * shares) / supply, b),
-      mt = minimum((t * shares) / supply, b);
+    const outRtm = (r * shares) / supply;
+    const outToken = (t * shares) / supply;
+    if (outRtm > r || outToken > t)
+      throw Error("LP withdrawal exceeds the pool's real reserves.");
+    const mr = minimum(outRtm, b),
+      mt = minimum(outToken, b);
     if (mr <= 0n || mt <= 0n) throw Error("Withdrawal is too small.");
     method = "remove_liquidity";
     args = [
@@ -292,4 +298,3 @@ export function makePlan(input: {
     approval,
   };
 }
-
