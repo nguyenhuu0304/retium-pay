@@ -46,7 +46,7 @@ async function findInList(query: Query, method: string, token: string, kind: "cl
     const rows = Array.isArray(data) ? data : data?.pools;
     if (!Array.isArray(rows) || rows.length > 100) throw Error("Invalid pool list.");
     for (const row of rows) {
-      const rowToken = kind === "v2" ? row?.tokenId : row?.token_b;
+      const rowToken = kind === "v2" ? (row?.token ?? row?.tokenId) : row?.token_b;
       if (rowToken === token) return parsePool(row, token, kind);
     }
     const next = Array.isArray(data) ? null : data.next;
