@@ -101,8 +101,8 @@ export function quoteV2(input: bigint, direction: string, pool: Pool): bigint {
     const fee = (grossOutput * feeBps) / 10000n;
     const netOutput = grossOutput - fee;
     // Virtual RTM is used for pricing, not as withdrawable liquidity.
-    // Never quote a sell that exceeds the pool's actual RTM reserve.
-    if (netOutput > reserveRtm)
+    // The gross curve output (user proceeds plus fee) must fit real reserves.
+    if (grossOutput > reserveRtm)
       throw Error("V2 pool has insufficient real RTM liquidity for this sell.");
     return netOutput;
   }
