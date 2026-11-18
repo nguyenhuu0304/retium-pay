@@ -102,7 +102,7 @@ export function makePlan(input: {
   const i = input;
   const b = i.bps;
   if (["add", "remove", "lock"].includes(i.action)) {
-    throw Error("Whisk DexCore metadata does not advertise the legacy LP add/remove/lock methods. These actions remain disabled until a supported liquidity interface is verified.");
+    throw Error("The exact Whisk liquidity method signatures and LP accounting have not yet been verified against the deployed contract. Add/remove/lock remain disabled to avoid submitting an unsafe call.");
   }
   if (!Number.isInteger(b) || b < 10 || b > 500)
     throw Error("Slippage must be between 0.10% and 5.00%.");
