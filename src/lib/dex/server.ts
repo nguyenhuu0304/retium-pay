@@ -76,8 +76,10 @@ export async function pools(cursor: string) {
       ...classicRows.filter((p: any) => p && /^[0-9a-f]{64}$/.test(p.token_b)).map((p: any) => ({
         token: p.token_b, reserveRtm: atomic(p.reserve_rtm).toString(), kind: "classic" as const,
       })),
-      ...v2Rows.filter((p: any) => p && /^[0-9a-f]{64}$/.test(p.tokenId)).map((p: any) => ({
-        token: p.tokenId, reserveRtm: atomic(p.reserveRtm).toString(), kind: "v2" as const,
+      ...v2Rows.filter((p: any) => p && /^[0-9a-f]{64}$/.test(p.token ?? p.tokenId)).map((p: any) => ({
+        token: p.token ?? p.tokenId,
+        reserveRtm: atomic(p.reserve_rtm ?? p.reserveRtm).toString(),
+        kind: "v2" as const,
       })),
     ].slice(0, 200),
     next: nextValues.length ? String(Math.min(...nextValues)) : null,
