@@ -8,17 +8,20 @@ function parsePool(value: unknown, token: string, kind: "classic" | "v2"): Pool 
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw Error("Invalid pool response.");
   const p = value as Record<string, unknown>;
-  const returnedToken = kind === "v2" ? p.token : p.token_b;
+  // Whisk returns classic pools in snake_case and V2 pools in camelCase.
+  const returnedToken = kind === "v2" ? p.tokenId : p.token_b;
   if (typeof returnedToken !== "string" || !/^[0-9a-f]{64}$/.test(returnedToken) || returnedToken !== token)
     throw Error("Wrong pool returned.");
+  const reserveRtm = kind === "v2" ? p.reserveRtm : p.reserve_rtm;
+  const reserveToken = kind === "v2" ? p.reserveToken : p.reserve_token;
   const pool: Pool = {
     token_b: token,
-    reserve_rtm: atomic(p.reserve_rtm).toString(),
-    reserve_token: atomic(p.reserve_token).toString(),
+    reserve_rtm: atomic(reserveRtm).toString(),
+    reserve_token: atomic(reserveToken).toString(),
     lp_supply: kind === "classic" ? atomic(p.lp_supply).toString() : "0",
     kind,
   };
-  if (kind === "v2") pool.virtual_rtm = atomic(p.virtual_rtm).toString();
+  if (kind === "v2") pool.virtual_rtm = atomic(p.virtualRtm).toString();
   return pool;
 }
 
@@ -42,7 +45,7 @@ async function findInList(query: Query, method: string, token: string, kind: "cl
     const rows = Array.isArray(data) ? data : data?.pools;
     if (!Array.isArray(rows) || rows.length > 100) throw Error("Invalid pool list.");
     for (const row of rows) {
-      const rowToken = kind === "v2" ? row?.token : row?.token_b;
+      const rowToken = kind === "v2" ? row?.tokenId : row?.token_b;
       if (rowToken === token) return parsePool(row, token, kind);
     }
     const next = Array.isArray(data) ? null : data.next;
