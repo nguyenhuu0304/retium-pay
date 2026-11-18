@@ -120,8 +120,8 @@ export async function market(token: string, wallet: string) {
   const account = await rpcRead(`wallet/${wallet}`);
   const balanceToken = atomic(await query(token, "balance_of", [wallet]));
   const allowance = atomic(await query(token, "allowance", [wallet, DEX]));
-  // Current Whisk DexCore metadata does not advertise get_lp_balance.
-  // Never call the legacy LP view and never infer an LP position from pool reserves.
+  // The exact LP-balance query and response schema are not yet verified.
+  // Never infer an LP position from pool reserves.
   const lp = 0n, locked = 0n, untilMs = 0;
   const nonce = account.nonce ?? account.next_nonce;
   if (!Number.isSafeInteger(nonce) || nonce < 0)
