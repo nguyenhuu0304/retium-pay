@@ -78,6 +78,31 @@ export function output(input: bigint, reserveIn: bigint, reserveOut: bigint) {
     throw Error("Pool has no usable liquidity.");
   return (input * 997n * reserveOut) / (reserveIn * 1000n + input * 997n);
 }
+
+// Whisk V2 uses a 1% fee. Buy fees are deducted from input before the
+// virtual-reserve curve; sell fees are deducted from gross RTM output.
+export function quoteV2(input: bigint, direction: string, pool: Pool): bigint {
+  if (pool.kind !== "v2" || input <= 0n)
+    throw Error("Invalid V2 quote input.");
+  const virtualRtm = atomic(pool.virtual_rtm);
+  const reserveRtm = atomic(pool.reserve_rtm);
+  const reserveToken = atomic(pool.reserve_token);
+  const curveRtm = virtualRtm + reserveRtm;
+  if (curveRtm <= 0n || reserveToken <= 0n)
+    throw Error("V2 pool has no usable liquidity.");
+  const feeBps = 100n;
+  if (direction === "RTM_TO_TOKEN") {
+    const netInput = (input * (10000n - feeBps)) / 10000n;
+    if (netInput <= 0n) throw Error("Trade is too small.");
+    return (reserveToken * netInput) / (curveRtm + netInput);
+  }
+  if (direction === "TOKEN_TO_RTM") {
+    const grossOutput = (curveRtm * input) / (reserveToken + input);
+    const fee = (grossOutput * feeBps) / 10000n;
+    return grossOutput - fee;
+  }
+  throw Error("Invalid swap direction.");
+}
 export function makePlan(input: {
   wallet: string;
   token: string;
@@ -118,16 +143,16 @@ export function makePlan(input: {
   const summary: string[] = [];
   if (i.action === "swap") {
     if (!p) throw Error("No pool exists for this token.");
-    if (p.kind === "v2")
-      throw Error("Whisk V2 pool detected. Its exact quote formula has not yet been verified, so this trade is not enabled rather than using the classic-pool formula.");
     const amount = units(i.amount),
       rtm = i.direction === "RTM_TO_TOKEN";
     if (!rtm && i.direction !== "TOKEN_TO_RTM")
       throw Error("Invalid swap direction.");
-    const expected = output(amount, rtm ? r : t, rtm ? t : r),
+    const expected = p.kind === "v2"
+        ? quoteV2(amount, i.direction, p)
+        : output(amount, rtm ? r : t, rtm ? t : r),
       min = minimum(expected, b);
     if (min <= 0n) throw Error("Trade is too small.");
-    method = "swap";
+    method = p.kind === "v2" ? "swap_v2" : "swap";
     args = [
       i.token,
       amount.toString(),
@@ -142,11 +167,16 @@ export function makePlan(input: {
       `Estimated receive: ${fmt(expected)} ${rtm ? i.symbol : "RTM"}`,
       `Minimum receive: ${fmt(min)} ${rtm ? i.symbol : "RTM"}`,
     );
-    const impact = (amount * 10000n) / ((rtm ? r : t) + amount);
+    const impact = p.kind === "v2"
+      ? (rtm
+          ? (((amount * 9900n) / 10000n) * 10000n) /
+            (atomic(p.virtual_rtm) + r + (amount * 9900n) / 10000n)
+          : (amount * 10000n) / (t + amount))
+      : (amount * 10000n) / ((rtm ? r : t) + amount);
     if (impact >= 1000n)
       throw Error("Price impact is at least 10%. Reduce the trade size.");
     summary.push(
-      `Pool fee: 0.3% of input. Price impact estimate: ${Number(impact) / 100}%.`,
+      `Pool fee: ${p.kind === "v2" ? "1%" : "0.3%"} of input/output. Price impact estimate: ${Number(impact) / 100}%.`,
     );
   } else if (i.action === "add") {
     if (!p || r <= 0n || t <= 0n || supply <= 0n)
