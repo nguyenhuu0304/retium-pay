@@ -19,6 +19,7 @@ import {
   fmt,
   units,
   output,
+  quoteV2,
   minimum,
   UNIT,
   type Plan,
@@ -521,14 +522,17 @@ export default function DexPage() {
   const inputRtm = direction === "RTM_TO_TOKEN";
   let estimate = "—",
     minimumReceive = "—";
-  if (action === "swap" && activeMarket?.pool && activeMarket.pool.kind !== "v2") {
+  if (action === "swap" && activeMarket?.pool) {
     try {
       const pool = activeMarket.pool;
-      const result = output(
-        units(amount),
-        BigInt(inputRtm ? pool.reserve_rtm : pool.reserve_token),
-        BigInt(inputRtm ? pool.reserve_token : pool.reserve_rtm),
-      );
+      const inputAmount = units(amount);
+      const result = pool.kind === "v2"
+        ? quoteV2(inputAmount, direction, pool)
+        : output(
+            inputAmount,
+            BigInt(inputRtm ? pool.reserve_rtm : pool.reserve_token),
+            BigInt(inputRtm ? pool.reserve_token : pool.reserve_rtm),
+          );
       const bps = Math.round(Number(slip) * 100);
       if (bps >= 10 && bps <= 500) {
         estimate = displayAmount(result);
@@ -1080,7 +1084,7 @@ export default function DexPage() {
         </details>
         {action === "swap" && (
           <p className="dex-muted">
-            {<UiText text={"Pool fee 0.3%. The network fee is separate."} />}
+            {<UiText text={activeMarket?.pool?.kind === "v2" ? "Pool fee 1%. The network fee is separate." : "Pool fee 0.3%. The network fee is separate."} />}
           </p>
         )}
         {activeMarket && !activeMarket.pool && action !== "create" && (
