@@ -133,6 +133,9 @@ export function makePlan(input: {
   const b = i.bps;
   if (!Number.isInteger(b) || b < 10 || b > 500)
     throw Error("Slippage must be between 0.10% and 5.00%.");
+  if (["add", "remove", "lock"].includes(i.action) &&
+      (!i.pool || i.pool.kind === "v2" || atomic(i.pool.lp_supply) <= 0n))
+    throw Error("Liquidity management is currently supported only for verified Classic pools.");
   const deadline = i.now + 20 * 60_000;
   const p = i.pool,
     r = p ? atomic(p.reserve_rtm) : 0n,
